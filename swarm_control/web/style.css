@@ -1,0 +1,79 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #05070d;
+  color: #e8eef7;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+#stage {
+  position: relative;
+  line-height: 0;
+}
+
+canvas#game {
+  display: block;
+  border-radius: 10px;
+  background: #0b1020;
+  box-shadow: 0 0 0 1px #1d2a44, 0 12px 40px rgba(0, 0, 0, 0.6);
+  touch-action: none;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+  white-space: pre-line;
+  line-height: 1.4;
+  font-size: clamp(20px, 5vmin, 40px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #f2f6ff;
+  background: rgba(5, 7, 13, 0.72);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+#overlay.show {
+  display: flex;
+}
+
+#legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  justify-content: center;
+  max-width: 94vw;
+  font-size: 13px;
+  color: #9fb0c9;
+}
+
+#legend kbd {
+  padding: 1px 6px;
+  border: 1px solid #26385a;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #16233c;
+  color: #dbe6f7;
+  font: inherit;
+}

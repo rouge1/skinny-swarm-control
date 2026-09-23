@@ -2,11 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Swarm Control</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<canvas id="game" width="540" height="960"></canvas>
+<div id="stage">
+  <canvas id="game" width="540" height="960"></canvas>
+  <div id="overlay">Connecting…</div>
+</div>
+<div id="legend">
+  <span><kbd>←</kbd><kbd>→</kbd> or <kbd>A</kbd><kbd>D</kbd> move</span>
+  <span><kbd>Space</kbd> hold to fire</span>
+  <span><kbd>P</kbd> pause / resume</span>
+  <span><kbd>R</kbd> restart</span>
+</div>
 <script src="/static/game.js"></script>
 </body>
 </html>
