@@ -1,0 +1,18 @@
+[project]
+name = "swarm-control"
+version = "0.1.0"
+description = "Mob Control-style browser game: launch a swarm of coding agents through multiplier gates and push back the bugs."
+requires-python = ">=3.12"
+dependencies = ["fastapi", "uvicorn[standard]", "numpy"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

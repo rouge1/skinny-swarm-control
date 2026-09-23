@@ -1,0 +1,27 @@
+"""Game constants shared by the simulation, server and client.
+
+Coordinates are field pixels: origin top-left, x to the right, y downward.
+The player's launcher sits near the bottom; the bug fortress ("Production")
+sits at the top. Agents (blue) move up (negative vy); bugs (red) move down.
+"""
+
+FIELD_W = 540.0
+FIELD_H = 960.0
+
+TICK_HZ = 60  # simulation steps per second
+SEND_HZ = 30  # state messages per second to the client
+
+BLUE_CAPACITY = 4000
+RED_CAPACITY = 4000
+
+UNIT_RADIUS = 5.0
+
+LAUNCHER_Y = 900.0
+LAUNCHER_SPEED = 420.0  # px/s while an arrow key is held
+LAUNCHER_MARGIN = 30.0  # launcher x is clamped to [MARGIN, FIELD_W - MARGIN]
+FIRE_INTERVAL = 0.12  # seconds between shots while fire is held
+
+AGENT_SPEED = 260.0  # px/s, upward
+
+ENEMY_BASE_Y = 70.0  # centre line of the bug fortress
+PLAYER_BASE_Y = 940.0  # bugs that reach this line damage the player
