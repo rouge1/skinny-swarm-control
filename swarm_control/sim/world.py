@@ -12,9 +12,13 @@ CONTRACT (acceptance tests: tests/test_world.py, added per phase):
     world.step(dt)       -> None; advances one step (does nothing unless playing)
     world.snapshot()     -> dict, a valid protocol "state" message
 
-This file is a stub: it produces valid, empty snapshots so the server and the
-client can be built before the real simulation exists.
+Phase 2 implements the launcher, firing and blue-agent flight. Each playing
+step moves the launcher, fires due agents, moves both pools, and culls units
+outside the field before advancing the tick counter.
 """
+
+import copy
+import math
 
 import numpy as np
 
@@ -26,15 +30,28 @@ from swarm_control.sim.pool import UnitPool
 class World:
     def __init__(self, seed: int = 0, level: dict | None = None) -> None:
         self.seed = seed
-        self.level = level or {}
-        self._rng = np.random.default_rng(seed)
+        self._level_template = copy.deepcopy(level or {})
         self.blue = UnitPool(config.BLUE_CAPACITY)
         self.red = UnitPool(config.RED_CAPACITY)
+        self._input = (False, False, False)
+        self._reset()
+
+    def _reset(self) -> None:
+        """Reset simulation state while retaining pools and current input."""
+        self.blue.clear()
+        self.red.clear()
+        self.level = copy.deepcopy(self._level_template)
+        self._rng = np.random.default_rng(self.seed)
         self.tick = 0
         self.status = "playing"
         self.launcher_x = config.FIELD_W / 2
-        self._input = (False, False, False)
         self._fire_timer = 0.0
+        self.enemy_hp = 100.0
+        self.enemy_hp_max = 100.0
+        self.player_hp = 100.0
+        self.player_hp_max = 100.0
+        self.level_number = 1
+        self.tokens = 0
 
     def set_input(self, left: bool, right: bool, fire: bool) -> None:
         self._input = (bool(left), bool(right), bool(fire))
@@ -47,13 +64,11 @@ class World:
         elif name == "resume" and self.status == "paused":
             self.status = "playing"
         elif name == "restart":
-            self.__init__(self.seed, self.level)
+            self._reset()
 
-    def step(self, dt: float) -> None:
-        if self.status != "playing":
-            return
-
-        left, right, fire = self._input
+    def _move_launcher(self, dt: float) -> None:
+        """Move and clamp the launcher from the current input."""
+        left, right, _fire = self._input
         direction = int(right) - int(left)
         self.launcher_x = float(
             np.clip(
@@ -63,20 +78,41 @@ class World:
             )
         )
 
-        if fire:
-            if self._fire_timer <= 0.0:
-                self.blue.spawn(
-                    self.launcher_x,
-                    config.LAUNCHER_Y - config.MUZZLE_OFFSET,
-                    vy=-config.AGENT_SPEED,
-                )
-                self._fire_timer = config.FIRE_INTERVAL
-            self._fire_timer -= dt
-        else:
-            self._fire_timer = 0.0
+    def _fire(self, dt: float) -> None:
+        """Spawn all shots due during this step."""
+        _left, _right, fire = self._input
+        self._fire_timer -= dt
+        if not fire:
+            self._fire_timer = max(0.0, self._fire_timer)
+            return
+        if self._fire_timer > 0.0:
+            return
 
+        shots = math.floor(-self._fire_timer / config.FIRE_INTERVAL) + 1
+        self._fire_timer += shots * config.FIRE_INTERVAL
+        self.blue.spawn_many(
+            np.full(shots, self.launcher_x),
+            np.full(shots, config.LAUNCHER_Y - config.MUZZLE_OFFSET),
+            vy=-config.AGENT_SPEED,
+        )
+
+    def _move_units(self, dt: float) -> None:
+        """Advance units in both pools."""
         self.blue.step(dt)
+        self.red.step(dt)
+
+    def _cull(self) -> None:
+        """Free units outside the field bounds."""
         self.blue.cull(0.0, -config.UNIT_RADIUS, config.FIELD_W, config.FIELD_H)
+        self.red.cull(0.0, -config.UNIT_RADIUS, config.FIELD_W, config.FIELD_H)
+
+    def step(self, dt: float) -> None:
+        if self.status != "playing" or not np.isfinite(dt) or dt < 0:
+            return
+        self._move_launcher(dt)
+        self._fire(dt)
+        self._move_units(dt)
+        self._cull()
         self.tick += 1
 
     def snapshot(self) -> dict:
@@ -98,11 +134,16 @@ class World:
                 self.red.kind[red_indices],
             ),
             "gates": [],
-            "bases": {"enemy_hp": 100.0, "enemy_hp_max": 100.0, "player_hp": 100.0, "player_hp_max": 100.0},
+            "bases": {
+                "enemy_hp": self.enemy_hp,
+                "enemy_hp_max": self.enemy_hp_max,
+                "player_hp": self.player_hp,
+                "player_hp_max": self.player_hp_max,
+            },
             "hud": {
                 "blue_count": self.blue.count,
                 "red_count": self.red.count,
-                "level": 1,
-                "tokens": 0,
+                "level": self.level_number,
+                "tokens": self.tokens,
             },
         }
