@@ -18,6 +18,7 @@ Run locally:  python -m swarm_control.server   (http://127.0.0.1:8000)
 
 import asyncio
 import json
+import logging
 from collections.abc import Callable
 from pathlib import Path
 
@@ -30,6 +31,10 @@ from swarm_control.protocol import ACTIONS
 from swarm_control.sim.world import World
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+
+logger = logging.getLogger(__name__)
+
+MAX_CATCHUP_STEPS = 5
 
 
 def _handle_message(world: World, msg: object) -> None:
@@ -70,70 +75,79 @@ def create_app(world_factory: Callable[[], World] = World) -> FastAPI:
                 }
             )
         except (WebSocketDisconnect, RuntimeError):
-            await websocket.close()
             return
 
         disconnected = asyncio.Event()
 
         async def reader() -> None:
-            try:
-                while True:
-                    try:
-                        message = await websocket.receive()
-                    except WebSocketDisconnect:
-                        disconnected.set()
-                        break
-                    except RuntimeError:
-                        disconnected.set()
-                        break
-                    if message.get("type") == "websocket.disconnect":
-                        disconnected.set()
-                        break
-                    text = message.get("text")
-                    if text is None:
-                        continue
-                    try:
-                        msg = json.loads(text)
-                    except (ValueError, UnicodeDecodeError):
-                        continue
+            while True:
+                try:
+                    message = await websocket.receive()
+                except (WebSocketDisconnect, RuntimeError):
+                    disconnected.set()
+                    break
+                if message.get("type") == "websocket.disconnect":
+                    disconnected.set()
+                    break
+                text = message.get("text")
+                if text is None:
+                    continue
+                try:
+                    msg = json.loads(text)
                     _handle_message(world, msg)
-            except asyncio.CancelledError:
-                pass
+                except (ValueError, RecursionError):
+                    continue
+                except Exception:
+                    logger.exception("error handling client message")
+                    continue
 
         dt = 1.0 / config.TICK_HZ
         steps_per_send = config.TICK_HZ // config.SEND_HZ
         reader_task = asyncio.create_task(reader())
+        close_code = 1000
         try:
             loop = asyncio.get_running_loop()
             next_tick = loop.time()
             steps = 0
             while not disconnected.is_set():
                 next_tick += dt
-                world.step(dt)
+                try:
+                    world.step(dt)
+                except Exception:
+                    logger.exception("world.step failed")
+                    close_code = 1011
+                    break
                 steps += 1
                 if steps % steps_per_send == 0:
                     try:
-                        await websocket.send_json(world.snapshot())
+                        snapshot = world.snapshot()
+                    except Exception:
+                        logger.exception("world.snapshot failed")
+                        close_code = 1011
+                        break
+                    try:
+                        await websocket.send_json(snapshot)
                     except (WebSocketDisconnect, RuntimeError):
                         break
-                delay = next_tick - loop.time()
-                if delay > 0:
-                    try:
-                        await asyncio.wait_for(disconnected.wait(), timeout=delay)
-                    except TimeoutError:
-                        pass
-                    else:
+                    except Exception:
+                        logger.exception("state send failed")
+                        close_code = 1011
                         break
-                elif delay < -0.25:
+                delay = next_tick - loop.time()
+                if delay < -MAX_CATCHUP_STEPS * dt:
                     next_tick = loop.time()
+                    delay = 0
+                await asyncio.sleep(max(delay, 0))
         finally:
             reader_task.cancel()
             try:
                 await reader_task
-            except (asyncio.CancelledError, WebSocketDisconnect, RuntimeError):
+            except asyncio.CancelledError:
                 pass
+            except Exception:
+                logger.exception("ws reader task failed")
             try:
-                await websocket.close()
+                await websocket.close(code=close_code)
             except (WebSocketDisconnect, RuntimeError):
                 pass
 
