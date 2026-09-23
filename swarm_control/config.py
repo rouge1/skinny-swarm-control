@@ -27,3 +27,9 @@ ENEMY_BASE_Y = 70.0  # centre line of the bug fortress
 PLAYER_BASE_Y = 940.0  # bugs that reach this line damage the player
 
 MUZZLE_OFFSET = 20.0  # agents spawn this far above the launcher
+
+# --- phase 3: combat, gates, waves
+ENEMY_HIT_Y = 110.0  # agents at or above this line hit the fortress (1 damage each)
+BUG_SPAWN_Y = 120.0  # bugs enter just below the fortress
+GATE_SCATTER = 12.0  # copies from a gate appear within this many px of their parent
+MAX_GATES = 32  # a uint32 bit mask tracks which gates each agent has passed
