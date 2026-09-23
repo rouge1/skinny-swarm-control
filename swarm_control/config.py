@@ -25,3 +25,5 @@ AGENT_SPEED = 260.0  # px/s, upward
 
 ENEMY_BASE_Y = 70.0  # centre line of the bug fortress
 PLAYER_BASE_Y = 940.0  # bugs that reach this line damage the player
+
+MUZZLE_OFFSET = 20.0  # agents spawn this far above the launcher
