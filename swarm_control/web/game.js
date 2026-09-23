@@ -48,12 +48,32 @@ function resize() {
   ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
 }
 
+// Re-register a matchMedia listener whenever devicePixelRatio changes.
+var dprQuery = null;
+
+function onDprChange() {
+  watchDpr();
+  resize();
+}
+
+function watchDpr() {
+  if (!window.matchMedia) return;
+  var dpr = window.devicePixelRatio || 1;
+  if (dprQuery) {
+    if (dprQuery.removeEventListener) dprQuery.removeEventListener("change", onDprChange);
+    else if (dprQuery.removeListener) dprQuery.removeListener(onDprChange);
+  }
+  dprQuery = window.matchMedia("(resolution: " + dpr + "dppx)");
+  if (dprQuery.addEventListener) dprQuery.addEventListener("change", onDprChange);
+  else if (dprQuery.addListener) dprQuery.addListener(onDprChange);
+}
+
 // ---------------------------------------------------------------------------
 // Game state
 // ---------------------------------------------------------------------------
 var latest = null; // most recent valid "state" message
 var haveState = false;
-var mockMode = new URLSearchParams(window.location.search).has("mock");
+var mockMode = new URLSearchParams(window.location.search).get("mock") === "1";
 
 var DEFAULT_STATE = {
   type: "state",
@@ -84,7 +104,6 @@ function connect() {
     return;
   }
   socket.onopen = function () {
-    backoff = 500;
     sentInput = { left: false, right: false, fire: false };
     sendInput(true);
   };
@@ -102,6 +121,7 @@ function connect() {
     } else if (msg.type === "state") {
       latest = msg;
       haveState = true;
+      backoff = 500; // healthy connection: reset the reconnect backoff
     }
   };
   socket.onclose = function () {
@@ -115,22 +135,26 @@ function connect() {
 }
 
 function scheduleReconnect() {
-  window.setTimeout(connect, backoff);
+  var delay = backoff + Math.random() * 250; // small jitter
+  window.setTimeout(connect, delay);
   backoff = Math.min(backoff * 2, 10000);
 }
 
 // ---------------------------------------------------------------------------
 // Keyboard input
 // ---------------------------------------------------------------------------
-var KEYMAP = {
-  ArrowLeft: "left",
-  KeyA: "left",
-  ArrowRight: "right",
-  KeyD: "right",
-  Space: "fire",
-};
+var KEYS = new Set(["ArrowLeft", "KeyA", "ArrowRight", "KeyD", "Space"]);
 var keys = { left: false, right: false, fire: false };
 var sentInput = { left: false, right: false, fire: false };
+var held = new Set(); // e.code values currently held
+
+// Derive the three booleans from the set of held keys and send if changed.
+function syncKeys() {
+  keys.left = held.has("ArrowLeft") || held.has("KeyA");
+  keys.right = held.has("ArrowRight") || held.has("KeyD");
+  keys.fire = held.has("Space");
+  sendInput(false);
+}
 
 function sendInput(force) {
   if (mockMode) return;
@@ -151,6 +175,7 @@ function sendInput(force) {
 }
 
 function releaseKeys() {
+  held.clear();
   keys.left = false;
   keys.right = false;
   keys.fire = false;
@@ -158,12 +183,13 @@ function releaseKeys() {
 }
 
 function onKeyDown(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return; // ignore shortcuts
   var code = e.code;
-  if (code in KEYMAP) e.preventDefault();
+  if (KEYS.has(code)) e.preventDefault();
   if (e.repeat) return; // ignore auto-repeat
-  if (code in KEYMAP) {
-    keys[KEYMAP[code]] = true;
-    sendInput(false);
+  if (KEYS.has(code)) {
+    held.add(code);
+    syncKeys();
     return;
   }
   if (code === "KeyP") {
@@ -177,10 +203,10 @@ function onKeyDown(e) {
 
 function onKeyUp(e) {
   var code = e.code;
-  if (code in KEYMAP) {
+  if (KEYS.has(code)) {
     e.preventDefault();
-    keys[KEYMAP[code]] = false;
-    sendInput(false);
+    held.delete(code);
+    syncKeys();
   }
 }
 
@@ -246,14 +272,14 @@ function mockStep(dt) {
 
   sim.fireTimer -= dt;
   if (keys.fire && sim.fireTimer <= 0 && sim.blue.length < BLUE_CAPACITY * 3) {
-    sim.blue.push(Math.round(sim.launcherX), LAUNCHER_Y - 20, 0);
+    sim.blue.push(sim.launcherX, LAUNCHER_Y - 20, 0);
     sim.fireTimer = FIRE_INTERVAL;
   }
 
   var nb = [];
   for (var i = 0; i < sim.blue.length; i += 3) {
     var by = sim.blue[i + 1] - AGENT_SPEED * dt;
-    if (by > FORTRESS_Y) nb.push(sim.blue[i], Math.round(by), sim.blue[i + 2]);
+    if (by > FORTRESS_Y) nb.push(sim.blue[i], by, sim.blue[i + 2]);
     else {
       sim.enemyHp = Math.max(0, sim.enemyHp - 0.4);
       sim.tokens += 1;
@@ -263,14 +289,14 @@ function mockStep(dt) {
 
   sim.bugTimer -= dt;
   if (sim.bugTimer <= 0 && sim.red.length < RED_CAPACITY * 3) {
-    sim.red.push(Math.round(40 + Math.random() * (fieldW - 80)), FORTRESS_Y, 0);
+    sim.red.push(40 + Math.random() * (fieldW - 80), FORTRESS_Y, 0);
     sim.bugTimer = 0.6 + Math.random() * 1.2;
   }
 
   var nr = [];
   for (var j = 0; j < sim.red.length; j += 3) {
     var ry = sim.red[j + 1] + BUG_SPEED * dt;
-    if (ry < PLAYER_BASE_Y) nr.push(sim.red[j], Math.round(ry), sim.red[j + 2]);
+    if (ry < PLAYER_BASE_Y) nr.push(sim.red[j], ry, sim.red[j + 2]);
     else sim.playerHp = Math.max(0, sim.playerHp - 3);
   }
   sim.red = nr;
@@ -279,14 +305,21 @@ function mockStep(dt) {
   else if (sim.playerHp <= 0) sim.status = "lost";
 }
 
+// Round a packed unit list to whole field pixels for the wire format.
+function roundUnits(flat) {
+  var out = new Array(flat.length);
+  for (var i = 0; i < flat.length; i++) out[i] = Math.round(flat[i]);
+  return out;
+}
+
 function mockSnapshot() {
   return {
     type: "state",
     tick: sim.tick,
     status: sim.status,
     launcher: { x: sim.launcherX, y: LAUNCHER_Y },
-    blue: sim.blue,
-    red: sim.red,
+    blue: roundUnits(sim.blue),
+    red: roundUnits(sim.red),
     gates: MOCK_GATES,
     bases: {
       enemy_hp: sim.enemyHp,
@@ -473,6 +506,7 @@ var lastFrame = 0;
 var lastEmit = 0;
 
 function frame(now) {
+  window.requestAnimationFrame(frame); // keep looping even if this frame throws
   if (!lastFrame) lastFrame = now;
   var dt = Math.min((now - lastFrame) / 1000, 0.1);
   lastFrame = now;
@@ -488,7 +522,6 @@ function frame(now) {
 
   render();
   updateOverlay();
-  window.requestAnimationFrame(frame);
 }
 
 // ---------------------------------------------------------------------------
@@ -500,6 +533,7 @@ window.addEventListener("keyup", onKeyUp);
 window.addEventListener("blur", releaseKeys);
 
 resize();
+watchDpr();
 if (mockMode) {
   resetMock();
 } else {

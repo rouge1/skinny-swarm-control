@@ -44,6 +44,7 @@ canvas#game {
   padding: 20px;
   text-align: center;
   white-space: pre-line;
+  line-height: 1.4;
   font-size: clamp(20px, 5vmin, 40px);
   font-weight: 800;
   letter-spacing: 0.06em;
