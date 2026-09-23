@@ -37,11 +37,13 @@ def test_new_game_uses_level_one():
     w = new_game()
     assert w.level["id"] == 1 and w.level["gates"] == get_level(1)["gates"]
     s = w.snapshot()
-    assert validate_state(s) == [] and s["hud"]["level"] == 1 and len(s["gates"]) == len(get_level(1)["gates"])
+    assert validate_state(s) == [] and s["hud"]["level"] == 1
+    assert len(s["gates"]) == len(get_level(1)["gates"])
 
 
 def test_level_dict_is_copied():
-    lv = level(gates=[{"x": 10, "y": 500, "w": 100, "h": 30, "op": "mul", "value": 2, "label": "x2 fork", "vx": 50}])
+    g = {"x": 10, "y": 500, "w": 100, "h": 30, "op": "mul", "value": 2, "label": "x2 fork", "vx": 50}
+    lv = level(gates=[g])
     before = copy.deepcopy(lv)
     w = World(level=lv)
     run(w, 1)
