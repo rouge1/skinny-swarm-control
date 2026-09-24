@@ -113,3 +113,99 @@
 {"t": 1790207811275, "type": "task", "phase": "p3", "task": "waves", "model": "flash", "status": "review"}
 {"t": 1790207939112, "type": "run", "phase": "p3", "task": "combat", "model": "luna", "kind": "build", "session": "ses_f2f4da333ffe2HPmaGgaOQ5KKQ", "wall_s": 194.0, "exit": 0, "timed_out": false, "cost": 0.029975, "tokens_in": 63, "tokens_out": 5303, "tokens_reasoning": 4380, "cache_read": 486339, "model_s": 190.6, "messages": 21, "files_changed": 0}
 {"t": 1790207939112, "type": "task", "phase": "p3", "task": "combat", "model": "luna", "status": "review"}
+{"t": 1790208125169, "type": "note", "phase": "p3", "who": "orchestrator", "text": "Pushed main + bake-off branches to GitHub (rouge1/skinny-swarm-control); tools/ now in repo"}
+{"t": 1790208292136, "type": "note", "phase": "p3", "who": "orchestrator", "text": "Flash's waves run quit silently after a denied command outside its worktree; resuming same session"}
+{"t": 1790208292177, "type": "task", "phase": "p3", "task": "waves", "model": "flash", "status": "fixing"}
+{"t": 1790208292185, "type": "tests", "phase": "p3", "task": "combat", "model": "luna", "passed": 11, "failed": 0}
+{"t": 1790208345039, "type": "run", "phase": "p3", "task": "waves", "model": "flash", "kind": "fix", "session": "ses_f2f4d7bbeffe9K6fCuBp7RSyq2", "wall_s": 52.0, "exit": 0, "timed_out": false, "cost": 0.007361, "tokens_in": 29035, "tokens_out": 4180, "tokens_reasoning": 281, "cache_read": 109568, "model_s": 48.8, "messages": 5, "files_changed": 0}
+{"t": 1790208345039, "type": "task", "phase": "p3", "task": "waves", "model": "flash", "status": "review"}
+{"t": 1790208364141, "type": "run", "phase": "p3", "task": "gates", "model": "muse", "kind": "build", "session": "ses_f2f4d8fceffeX7z7ojs6l7f0I3", "wall_s": 614.0, "exit": 0, "timed_out": false, "cost": 0.029162, "tokens_in": 202249, "tokens_out": 6705, "tokens_reasoning": 35415, "cache_read": 256686, "model_s": 611.5, "messages": 15, "files_changed": 0}
+{"t": 1790208364142, "type": "task", "phase": "p3", "task": "gates", "model": "muse", "status": "review"}
+{"t": 1790208372695, "type": "tests", "phase": "p3", "task": "waves", "model": "flash", "passed": 46, "failed": 0}
+{"t": 1790208372747, "type": "crew", "phase": "p3", "who": "reviewer", "state": "busy", "doing": "Reviewing combat (Luna) and waves/levels (Flash)"}
+{"t": 1790208390672, "type": "tests", "phase": "p3", "task": "gates", "model": "muse", "passed": 41, "failed": 0}
+{"t": 1790208457158, "type": "task", "phase": "p3", "task": "hud", "model": "flash", "status": "working"}
+{"t": 1790208569673, "type": "review", "phase": "p3", "task": "gates", "model": "muse", "verdict": "changes", "findings": 6, "wall_s": 0, "summary": "np.repeat before capping to free slots: 319 MB to spawn 10 copies; bounce loop on absurd speeds"}
+{"t": 1790208569719, "type": "review", "phase": "p3", "task": "waves", "model": "flash", "verdict": "changes", "findings": 10, "wall_s": 0, "summary": "HIGH: levels trivially easy (L3 won in 3.2s standing still) and impossible to lose; NaN wave stalls spawner"}
+{"t": 1790208643681, "type": "review", "phase": "p3", "task": "combat", "model": "luna", "verdict": "changes", "findings": 6, "wall_s": 0, "summary": "HIGH: dense stacks match one pair per round (400v400 clump 133 ms); n x m edge list on stacks"}
+{"t": 1790208643714, "type": "task", "phase": "p3", "task": "combat", "status": "fixing", "model": "luna"}
+{"t": 1790208643753, "type": "task", "phase": "p3", "task": "gates", "status": "fixing", "model": "muse"}
+{"t": 1790208643790, "type": "task", "phase": "p3", "task": "waves", "status": "fixing", "model": "flash"}
+{"t": 1790208651758, "type": "task", "phase": "p3", "task": "combat", "model": "luna", "status": "fixing"}
+{"t": 1790208660098, "type": "run", "phase": "p3", "task": "hud", "model": "flash", "kind": "build", "session": "ses_f2f42c12fffedIj9KWAhzQxSbC", "wall_s": 202.1, "exit": -1, "timed_out": true, "cost": 0.007737, "tokens_in": 44252, "tokens_out": 835, "tokens_reasoning": 624, "cache_read": 74624, "model_s": 42.0, "messages": 7, "files_changed": 0}
+{"t": 1790208660098, "type": "task", "phase": "p3", "task": "hud", "model": "flash", "status": "failed", "note": "timed out"}
+{"t": 1790208671761, "type": "task", "phase": "p3", "task": "gates", "model": "muse", "status": "fixing"}
+{"t": 1790208691760, "type": "task", "phase": "p3", "task": "waves", "model": "flash", "status": "fixing"}
+{"t": 1790208706081, "type": "note", "phase": "p3", "who": "orchestrator", "text": "Watchdog false positive: Flash was writing a large file silently. Stall limit now 2 min before first output, 10 min after."}
+{"t": 1790208706126, "type": "task", "phase": "p3", "task": "hud", "model": "flash", "status": "fixing"}
+{"t": 1790208794804, "type": "run", "phase": "p3", "task": "combat", "model": "luna", "kind": "fix", "session": "ses_f2f4da333ffe2HPmaGgaOQ5KKQ", "wall_s": 142.0, "exit": 0, "timed_out": false, "cost": 0.024723, "tokens_in": 33, "tokens_out": 4648, "tokens_reasoning": 3170, "cache_read": 501113, "model_s": 139.7, "messages": 11, "files_changed": 0}
+{"t": 1790208794804, "type": "task", "phase": "p3", "task": "combat", "model": "luna", "status": "review"}
+{"t": 1790208906689, "type": "run", "phase": "p3", "task": "gates", "model": "muse", "kind": "fix", "session": "ses_f2f4d8fceffeX7z7ojs6l7f0I3", "wall_s": 234.0, "exit": 0, "timed_out": false, "cost": 0.006361, "tokens_in": 21028, "tokens_out": 4453, "tokens_reasoning": 14756, "cache_read": 208181, "model_s": 230.6, "messages": 5, "files_changed": 0}
+{"t": 1790208906689, "type": "task", "phase": "p3", "task": "gates", "model": "muse", "status": "review"}
+{"t": 1790208916226, "type": "note", "phase": "p3", "who": "orchestrator", "text": "Dashboard fix: three 'fixing' updates were logged without a worker and showed as Orchestrator cards; records corrected, tool now fills in the worker"}
+{"t": 1790208999610, "type": "tests", "phase": "p3", "task": "combat", "model": "luna", "passed": 38, "failed": 0}
+{"t": 1790208999656, "type": "tests", "phase": "p3", "task": "gates", "model": "muse", "passed": 41, "failed": 0}
+{"t": 1790208999700, "type": "note", "phase": "p3", "who": "luna", "text": "fixed combat: 400v400 clump 133 ms -> 7 ms, 300v300 stack 737 ms -> 0.3 ms (measured by the orchestrator)"}
+{"t": 1790208999742, "type": "crew", "phase": "p3", "who": "reviewer", "state": "busy", "doing": "Haiku checklist pass on combat + gates fixes"}
+{"t": 1790209109978, "type": "claude", "phase": "p0", "role": "orchestrator", "model": "claude-opus-5-5", "name": "Opus 5.5", "messages": 46, "input": 94, "output": 68011, "cache_read": 3822374, "cache_write": 119518, "cost": 3.0812}
+{"t": 1790209109978, "type": "claude", "phase": "p1", "role": "orchestrator", "model": "claude-opus-5-5", "name": "Opus 5.5", "messages": 34, "input": 72, "output": 29733, "cache_read": 5854630, "cache_write": 45896, "cost": 2.133}
+{"t": 1790209109978, "type": "claude", "phase": "p1", "role": "reviewer", "model": "claude-opus-5-5", "name": "Opus 5.5", "messages": 6, "input": 12, "output": 684, "cache_read": 222109, "cache_write": 55506, "cost": 0.3357}
+{"t": 1790209109978, "type": "claude", "phase": "p2", "role": "orchestrator", "model": "claude-opus-5-5", "name": "Opus 5.5", "messages": 57, "input": 122, "output": 46951, "cache_read": 13165711, "cache_write": 259499, "cost": 5.6486}
+{"t": 1790209109978, "type": "claude", "phase": "p2", "role": "reviewer", "model": "claude-opus-5-5", "name": "Opus 5.5", "messages": 42, "input": 84, "output": 3269, "cache_read": 1939351, "cache_write": 126859, "cost": 1.0879}
+{"t": 1790209109978, "type": "claude", "phase": "p3", "role": "orchestrator", "model": "claude-opus-5-5", "name": "Opus 5.5", "messages": 55, "input": 114, "output": 47605, "cache_read": 16680500, "cache_write": 364175, "cost": 7.2021}
+{"t": 1790209109978, "type": "claude", "phase": "p3", "role": "reviewer", "model": "claude-haiku-4-5", "name": "Haiku 4.5", "messages": 26, "input": 212, "output": 302, "cache_read": 845931, "cache_write": 81483, "cost": 0.1882}
+{"t": 1790209109978, "type": "claude", "phase": "p3", "role": "reviewer", "model": "claude-opus-5-5", "name": "Opus 5.5", "messages": 26, "input": 52, "output": 2624, "cache_read": 987800, "cache_write": 126372, "cost": 0.8821}
+{"t": 1790209122666, "type": "run", "phase": "p3", "task": "waves", "model": "flash", "kind": "fix", "session": "ses_f2f4d7bbeffe9K6fCuBp7RSyq2", "wall_s": 430.0, "exit": 0, "timed_out": false, "cost": 0.024486, "tokens_in": 40354, "tokens_out": 14332, "tokens_reasoning": 12840, "cache_read": 709888, "model_s": 428.0, "messages": 15, "files_changed": 0}
+{"t": 1790209122666, "type": "task", "phase": "p3", "task": "waves", "model": "flash", "status": "review"}
+{"t": 1790209213030, "type": "run", "phase": "p3", "task": "hud", "model": "flash", "kind": "fix", "session": "ses_f2f42c12fffedIj9KWAhzQxSbC", "wall_s": 506.0, "exit": 0, "timed_out": false, "cost": 0.023126, "tokens_in": 48904, "tokens_out": 8991, "tokens_reasoning": 13931, "cache_read": 678912, "model_s": 503.7, "messages": 14, "files_changed": 0}
+{"t": 1790209213030, "type": "task", "phase": "p3", "task": "hud", "model": "flash", "status": "review"}
+{"t": 1790209435398, "type": "review", "phase": "p3", "task": "combat", "model": "luna", "verdict": "pass", "findings": 0, "wall_s": 0, "summary": "Haiku checklist: 6/6 fixed; 4000v4000 stack 7.4 ms"}
+{"t": 1790209435437, "type": "review", "phase": "p3", "task": "gates", "model": "muse", "verdict": "pass", "findings": 0, "wall_s": 0, "summary": "Haiku checklist: 6/6 fixed"}
+{"t": 1790209435484, "type": "review", "phase": "p3", "task": "waves", "model": "flash", "verdict": "pass", "findings": 0, "wall_s": 0, "summary": "Validation fixed; idle loses, sweep wins; standing still at centre still wins in ~5 s -> balance task after world wiring"}
+{"t": 1790209435532, "type": "task", "phase": "p3", "task": "combat", "status": "merged", "model": "luna"}
+{"t": 1790209435577, "type": "task", "phase": "p3", "task": "gates", "status": "merged", "model": "muse"}
+{"t": 1790209435623, "type": "task", "phase": "p3", "task": "waves", "status": "merged", "model": "flash"}
+{"t": 1790209435669, "type": "task", "phase": "p3", "task": "balance", "status": "queued", "model": "flash", "title": "Level balance: no stand-still win"}
+{"t": 1790209435754, "type": "claude", "phase": "p3", "role": "orchestrator", "model": "claude-opus-5-5", "name": "Opus 5.5", "messages": 60, "input": 124, "output": 57205, "cache_read": 18628399, "cache_write": 381857, "cost": 7.9251}
+{"t": 1790209435754, "type": "claude", "phase": "p3", "role": "reviewer", "model": "claude-haiku-4-5", "name": "Haiku 4.5", "messages": 33, "input": 272, "output": 2107, "cache_read": 1144242, "cache_write": 86387, "cost": 0.2332}
+{"t": 1790209467601, "type": "crew", "phase": "p3", "who": "orchestrator", "state": "busy", "doing": "Luna wiring the World; then HUD review + balance"}
+{"t": 1790209467656, "type": "task", "phase": "p3", "task": "world", "model": "luna", "status": "working"}
+{"t": 1790209528871, "type": "note", "phase": "p3", "who": "orchestrator", "text": "Playwright mock-mode check of Flash's HUD: win screen, beetle bugs, gate labels, HP numbers render; no console errors"}
+{"t": 1790209542650, "type": "run", "phase": "p3", "task": "world", "model": "luna", "kind": "build", "session": "ses_f2f3356b0ffexqCTK8neYt8BLY", "wall_s": 74.0, "exit": 0, "timed_out": false, "cost": 0.018873, "tokens_in": 30, "tokens_out": 2917, "tokens_reasoning": 1221, "cache_read": 250902, "model_s": 70.6, "messages": 10, "files_changed": 0}
+{"t": 1790209542650, "type": "task", "phase": "p3", "task": "world", "model": "luna", "status": "review"}
+{"t": 1790209576558, "type": "tests", "phase": "p3", "task": "world", "model": "luna", "passed": 122, "failed": 0}
+{"t": 1790209576613, "type": "task", "phase": "p3", "task": "server", "status": "queued", "model": "muse", "title": "Server: start games on level 1"}
+{"t": 1790209576659, "type": "task", "phase": "p3", "task": "server", "model": "muse", "status": "working"}
+{"t": 1790209593598, "type": "run", "phase": "p3", "task": "server", "model": "muse", "kind": "build", "session": "ses_f2f31acd7ffeQpdtVVdKOBpxJ9", "wall_s": 16.0, "exit": 0, "timed_out": false, "cost": 0.00212, "tokens_in": 17707, "tokens_out": 688, "tokens_reasoning": 633, "cache_read": 42421, "model_s": 14.1, "messages": 5, "files_changed": 0}
+{"t": 1790209593598, "type": "task", "phase": "p3", "task": "server", "model": "muse", "status": "review"}
+{"t": 1790209627256, "type": "task", "phase": "p3", "task": "server", "status": "review", "model": "muse"}
+{"t": 1790209627308, "type": "note", "phase": "p3", "who": "orchestrator", "text": "Muse's server change verified by diff: new connections now start on level 1"}
+{"t": 1790209627350, "type": "task", "phase": "p3", "task": "balance", "model": "flash", "status": "working"}
+{"t": 1790209823526, "type": "review", "phase": "p3", "task": "hud", "model": "flash", "verdict": "changes", "findings": 3, "wall_s": 0, "summary": "Sonnet: 25/30; gate label font measured every frame; ~24k leg strokes at 4000 bugs"}
+{"t": 1790209823614, "type": "claude", "phase": "p3", "role": "orchestrator", "model": "claude-opus-5-5", "name": "Opus 5.5", "messages": 76, "input": 158, "output": 70888, "cache_read": 25189475, "cache_write": 404952, "cost": 9.6959}
+{"t": 1790209823614, "type": "claude", "phase": "p3", "role": "reviewer", "model": "claude-sonnet-5", "name": "Sonnet 5", "messages": 19, "input": 38, "output": 149, "cache_read": 1060385, "cache_write": 154947, "cost": 0.601}
+{"t": 1790209823661, "type": "task", "phase": "p3", "task": "hud", "model": "flash", "status": "fixing"}
+{"t": 1790209878629, "type": "run", "phase": "p3", "task": "hud", "model": "flash", "kind": "fix", "session": "ses_f2f42c12fffedIj9KWAhzQxSbC", "wall_s": 54.0, "exit": 0, "timed_out": false, "cost": 0.002364, "tokens_in": 874, "tokens_out": 1521, "tokens_reasoning": 933, "cache_read": 253568, "model_s": 50.4, "messages": 4, "files_changed": 0}
+{"t": 1790209878629, "type": "task", "phase": "p3", "task": "hud", "model": "flash", "status": "review"}
+{"t": 1790209895732, "type": "review", "phase": "p3", "task": "hud", "model": "flash", "verdict": "pass", "findings": 0, "wall_s": 0, "summary": "Orchestrator read the diff: font cache, 8px floor, legs only under 800 bugs"}
+{"t": 1790209980332, "type": "run", "phase": "p3", "task": "balance", "model": "flash", "kind": "build", "session": "ses_f2f30e6c5ffe4jfhgVuuPGqy0d", "wall_s": 352.0, "exit": 0, "timed_out": false, "cost": 0.02001, "tokens_in": 47913, "tokens_out": 3754, "tokens_reasoning": 14389, "cache_read": 645888, "model_s": 348.4, "messages": 18, "files_changed": 0}
+{"t": 1790209980332, "type": "task", "phase": "p3", "task": "balance", "model": "flash", "status": "review"}
+{"t": 1790209995440, "type": "review", "phase": "p3", "task": "world", "model": "luna", "verdict": "changes", "findings": 3, "wall_s": 0, "summary": "Sonnet 24/30: tie paid a win (spec ambiguity, orchestrator decided tie = loss); sandbox keys; add load_level"}
+{"t": 1790209995526, "type": "task", "phase": "p3", "task": "world", "model": "luna", "status": "fixing"}
+{"t": 1790210026519, "type": "run", "phase": "p3", "task": "world", "model": "luna", "kind": "fix", "session": "ses_f2f3356b0ffexqCTK8neYt8BLY", "wall_s": 30.0, "exit": 0, "timed_out": false, "cost": 0.007521, "tokens_in": 18, "tokens_out": 1094, "tokens_reasoning": 172, "cache_read": 229370, "model_s": 27.5, "messages": 6, "files_changed": 0}
+{"t": 1790210026519, "type": "task", "phase": "p3", "task": "world", "model": "luna", "status": "review"}
+{"t": 1790210205757, "type": "tests", "phase": "p3", "task": "world", "model": "luna", "passed": 126, "failed": 0}
+{"t": 1790210205816, "type": "tests", "phase": "p3", "task": "balance", "model": "flash", "passed": 42, "failed": 0}
+{"t": 1790210205865, "type": "review", "phase": "p3", "task": "world", "model": "luna", "verdict": "pass", "findings": 0, "wall_s": 0, "summary": "Fix verified: 126/126, tie = loss, load_level added"}
+{"t": 1790210205916, "type": "review", "phase": "p3", "task": "balance", "model": "flash", "verdict": "pass", "findings": 0, "wall_s": 0, "summary": "Sweep wins in 64-83 s, stand-still loses in 13-17 s, idle loses"}
+{"t": 1790210205971, "type": "review", "phase": "p3", "task": "server", "model": "muse", "verdict": "pass", "findings": 0, "wall_s": 0, "summary": ""}
+{"t": 1790210206022, "type": "task", "phase": "p3", "task": "world", "status": "merged", "model": "luna"}
+{"t": 1790210206069, "type": "task", "phase": "p3", "task": "server", "status": "merged", "model": "muse"}
+{"t": 1790210206119, "type": "task", "phase": "p3", "task": "hud", "status": "merged", "model": "flash"}
+{"t": 1790210206171, "type": "task", "phase": "p3", "task": "balance", "status": "merged", "model": "flash"}
+{"t": 1790210206225, "type": "note", "phase": "p3", "who": "orchestrator", "text": "Playwright bot won level 1 in the browser after ~66 s (sweep + fire); no console or server errors. Phase 3 merged: 127 tests green."}
+{"t": 1790210206280, "type": "phase", "phase": "p3", "status": "done"}
+{"t": 1790210206334, "type": "crew", "phase": "p3", "who": "orchestrator", "state": "idle", "doing": ""}
+{"t": 1790210206387, "type": "crew", "phase": "p3", "who": "reviewer", "state": "idle", "doing": ""}
+{"t": 1790210206490, "type": "claude", "phase": "p3", "role": "orchestrator", "model": "claude-opus-5-5", "name": "Opus 5.5", "messages": 92, "input": 196, "output": 81537, "cache_read": 32096322, "cache_write": 425360, "cost": 11.4537}
+{"t": 1790210206490, "type": "claude", "phase": "p3", "role": "reviewer", "model": "claude-sonnet-5", "name": "Sonnet 5", "messages": 23, "input": 46, "output": 180, "cache_read": 1429319, "cache_write": 171235, "cost": 0.7158}

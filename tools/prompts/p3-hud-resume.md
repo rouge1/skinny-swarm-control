@@ -1,0 +1,1 @@
+Your previous turn was interrupted before you wrote any files. You have already read everything you need. Now write the changes to swarm_control/web/game.js and style.css (and index.html if needed) as described in the task, then run the ruff check. Do not list or read anything outside the working directory.

@@ -188,7 +188,7 @@ kbd { font: 500 10.5px var(--mono); border: 1px solid var(--line); border-bottom
           <div class="seg scope" role="group" aria-label="Spend scope"><button id="sc-phase" aria-pressed="true">This phase</button><button id="sc-all" aria-pressed="false">All phases</button></div>
         </div>
         <div class="tbl-wrap"><table id="spend"></table></div>
-        <div class="eyebrow" style="letter-spacing:.04em;text-transform:none;font-family:var(--body);font-weight:400">Wall = clock time of the run. Model = time the model spent generating. Cost as billed by OpenRouter, reported by OpenCode.</div>
+        <div class="eyebrow" style="letter-spacing:.04em;text-transform:none;font-family:var(--body);font-weight:400">Wall = clock time of the run. Model = time the model spent generating. Worker cost as billed by OpenRouter, reported by OpenCode. Claude cost is the API list-price equivalent of this session's transcripts (tokens include cache reads); on a Claude subscription it is not billed per token.</div>
       </section>
       <section class="panel">
         <div class="panel-h"><h2>Activity</h2><span class="eyebrow" id="feedCount"></span></div>
@@ -250,7 +250,7 @@ kbd { font: 500 10.5px var(--mono); border: 1px solid var(--line); border-bottom
 
   // ---------------------------------------------------------------- fold
   function fold(nowT) {
-    const s = { phases: {}, cur: "p0", tasks: new Map(), crew: {}, spend: {}, feed: [], scores: [], first: st.events[0]?.t };
+    const s = { phases: {}, cur: "p0", tasks: new Map(), crew: {}, spend: {}, claude: {}, feed: [], scores: [], first: st.events[0]?.t };
     const agg = (ph, m) => ((s.spend[ph] ??= {})[m] ??= { runs: 0, fixes: 0, wall: 0, model: 0, tokens: 0, cost: 0 });
     for (const e of st.events) {
       if (e.t > nowT) break;
@@ -272,11 +272,25 @@ kbd { font: 500 10.5px var(--mono); border: 1px solid var(--line); border-bottom
         case "tests": task().tests = e; break;
         case "score": task().score = e.score; s.scores.push(e); break;
         case "crew": s.crew[e.who] = e; break;
+        case "claude": s.claude[`${e.phase}|${e.role}|${e.model}`] = e; continue; // tallies stay out of the feed
       }
       s.feed.push(e);
     }
     return s;
   }
+
+  // Claude usage rows: {role, model, name, messages, tokens, cost} for one phase or all phases
+  function claudeRows(s, phase) {
+    const rows = {};
+    for (const e of Object.values(s.claude)) {
+      if (phase && e.phase !== phase) continue;
+      const r = rows[`${e.role}|${e.model}`] ??= { role: e.role, model: e.model, name: e.name, messages: 0, output: 0, tokens: 0, cost: 0 };
+      r.messages += e.messages; r.output += e.output; r.cost += e.cost;
+      r.tokens += e.input + e.output + e.cache_read + e.cache_write;
+    }
+    return Object.values(rows).sort((a, b) => (a.role > b.role ? 1 : -1) || b.cost - a.cost);
+  }
+  const CLAUDE_COLOR = { "claude-opus-5-5": "var(--orchestrator)", "claude-sonnet-5": "var(--reviewer)", "claude-haiku-4-5": "var(--muse)" };
 
   function feedText(e) {
     const who = (m) => `<span class="chip" style="--c:${colorOf(m)}">${esc(modelName(m))}</span>`;
@@ -289,7 +303,7 @@ kbd { font: 500 10.5px var(--mono); border: 1px solid var(--line); border-bottom
       case "tests": return `Tests on ${tk} (${esc(modelName(e.model))}): <span class="mono" style="color:${e.failed ? "var(--bug)" : "var(--ok)"}">${e.passed} passed, ${e.failed} failed</span>`;
       case "score": return `Bake-off score for ${esc(modelName(e.model))}: <b class="mono">${e.score}</b>/100${e.summary ? ` <span style="color:var(--muted)">${esc(e.summary)}</span>` : ""}`;
       case "crew": return `${who(e.who)} ${e.state === "busy" ? esc(e.doing) : "is idle"}`;
-      case "note": return `${who(e.who === "orchestrator" ? null : e.who)} ${esc(e.text)}`;
+      case "note": return e.who === "orchestrator" ? `${who(null)} noted: ${esc(e.text)}` : `${who(e.who)} ${esc(e.text)}`;
     }
     return esc(e.type);
   }
@@ -360,7 +374,12 @@ kbd { font: 500 10.5px var(--mono); border: 1px solid var(--line); border-bottom
         if (act) { busy = true; since = act.since; doing = `${act.status === "fixing" ? "Fixing" : "Building"} <b>${esc(act.title || act.task)}</b> <span class="mono" style="color:var(--muted)">${esc(act.phase.toUpperCase())}</span>`; }
       }
       const tot = Object.values(s.spend).reduce((a, ph) => { const r = ph[l.key]; if (r) { a.cost += r.cost; a.wall += r.wall; a.runs += r.runs; } return a; }, { cost: 0, wall: 0, runs: 0 });
-      const metaRight = (l.key in ROLES) ? `<span class="num">${tot.runs} runs · ${fmtS(tot.wall)} · ${fmtC(tot.cost)}</span>` : `<span></span>`;
+      let metaRight = `<span></span>`;
+      if (l.key in ROLES) metaRight = `<span class="num">${tot.runs} runs · ${fmtS(tot.wall)} · ${fmtC(tot.cost)}</span>`;
+      else {
+        const cr = claudeRows(s, null).filter((r) => r.role === l.key);
+        if (cr.length) metaRight = `<span class="num">${cr.map((r) => `${esc(r.name)} ${fmtC(r.cost)}`).join(" · ")}</span>`;
+      }
       return `<article class="lane ${busy ? "busy" : ""}" style="--c:${colorOf(l.key)}">
         <div class="who"><span class="sig"></span><h3>${esc(l.name)}</h3></div>
         <div class="role">${esc(l.role)}</div>
@@ -402,7 +421,17 @@ kbd { font: 500 10.5px var(--mono); border: 1px solid var(--line); border-bottom
     const tot = rows.reduce((a, [, r]) => { for (const k in r) a[k] = (a[k] || 0) + r[k]; return a; }, {});
     $("spend").innerHTML = `<thead><tr><th>Worker</th><th>Runs</th><th>Fixes</th><th>Wall</th><th>Model</th><th>Tokens</th><th>Cost</th></tr></thead><tbody>` +
       rows.map(([m, r]) => `<tr><td><span class="chip" style="--c:${colorOf(m.key)}">${esc(m.name)}</span></td><td class="num">${r.runs}</td><td class="num">${r.fixes}</td><td class="num">${fmtS(r.wall)}</td><td class="num">${fmtS(r.model)}</td><td class="num">${fmtK(r.tokens)}</td><td class="num">${fmtC(r.cost)}</td></tr>`).join("") +
-      `<tr class="total"><td>Total</td><td class="num">${tot.runs || 0}</td><td class="num">${tot.fixes || 0}</td><td class="num">${fmtS(tot.wall || 0)}</td><td class="num">${fmtS(tot.model || 0)}</td><td class="num">${fmtK(tot.tokens || 0)}</td><td class="num">${fmtC(tot.cost || 0)}</td></tr></tbody>`;
+      `<tr class="total"><td>Workers total</td><td class="num">${tot.runs || 0}</td><td class="num">${tot.fixes || 0}</td><td class="num">${fmtS(tot.wall || 0)}</td><td class="num">${fmtS(tot.model || 0)}</td><td class="num">${fmtK(tot.tokens || 0)}</td><td class="num">${fmtC(tot.cost || 0)}</td></tr>` +
+      (() => {
+        const cr = claudeRows(s, st.scope === "all" ? null : view);
+        if (!cr.length) return "</tbody>";
+        const ct = cr.reduce((a, r) => a + r.cost, 0);
+        return `<tr><th colspan="7" style="padding-top:14px">Claude · orchestration &amp; review</th></tr>` +
+          `<tr><th>Role · model</th><th>Msgs</th><th></th><th></th><th>Output</th><th>Tokens</th><th>Cost</th></tr>` +
+          cr.map((r) => `<tr><td><span class="chip" style="--c:${CLAUDE_COLOR[r.model] || "var(--muted)"}">${r.role === "orchestrator" ? "Orchestrator" : "Reviewer"} · ${esc(r.name)}</span></td><td class="num">${r.messages}</td><td></td><td></td><td class="num">${fmtK(r.output)}</td><td class="num">${fmtK(r.tokens)}</td><td class="num">${fmtC(r.cost)}</td></tr>`).join("") +
+          `<tr class="total"><td>Claude total</td><td colspan="5"></td><td class="num">${fmtC(ct)}</td></tr>` +
+          `<tr class="total"><td>Project total</td><td colspan="5"></td><td class="num">${fmtC(ct + (tot.cost || 0))}</td></tr></tbody>`;
+      })();
 
     // bake-off
     const bake = vt.length && s.scores.some((e) => e.phase === view) ? view : (s.scores[0]?.phase);

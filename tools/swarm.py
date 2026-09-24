@@ -130,8 +130,11 @@ def cmd_run(a):
         # watchdog: kill on the overall timeout, or if the worker prints nothing for a.stall seconds
         while proc.poll() is None:
             time.sleep(2)
-            idle = time.time() - log.stat().st_mtime
-            if time.monotonic() - t0 > a.timeout or idle > a.stall:
+            st = log.stat()
+            idle = time.time() - st.st_mtime
+            # a run that never prints is hung; one that has started may be quietly writing a big file
+            limit = a.stall if st.st_size == 0 else a.stall_active
+            if time.monotonic() - t0 > a.timeout or idle > limit:
                 proc.kill()
                 proc.wait()
                 timed_out = True
@@ -175,6 +178,13 @@ def cmd_phase(a):
 
 
 def cmd_task(a):
+    if not a.model:
+        # fill in the worker from earlier events so a status change never creates an ownerless card
+        owners = {e.get("model") for e in load_events()
+                  if e["type"] == "task" and e["phase"] == a.phase and e["task"] == a.task and e.get("model")}
+        if len(owners) > 1:
+            sys.exit(f"task {a.phase}/{a.task} has several workers {sorted(owners)}; pass --model")
+        a.model = owners.pop() if owners else None
     ev = {"type": "task", "phase": a.phase, "task": a.task, "status": a.status}
     for k in ("model", "title", "note", "files"):
         if getattr(a, k):
@@ -304,6 +314,100 @@ def cmd_export(a):
     print(out)
 
 
+# ---------------------------------------------------------------- claude usage
+
+# $ per million tokens (Anthropic list prices): input, output, cache read, cache write 5m, cache write 1h
+CLAUDE_PRICES = {
+    "claude-opus-5-5": (4.00, 20.00, 0.20, 5.00, 8.00),
+    "claude-sonnet-5": (2.00, 10.00, 0.20, 2.50, 4.00),
+    "claude-haiku-4-5": (1.00, 5.00, 0.10, 1.25, 2.00),
+}
+CLAUDE_NAMES = {"claude-opus-5-5": "Opus 5.5", "claude-sonnet-5": "Sonnet 5", "claude-haiku-4-5": "Haiku 4.5"}
+SESSION_DIR = Path.home() / ".claude/projects/-data-python-learn"
+
+
+def _price_key(model: str) -> str:
+    for k in CLAUDE_PRICES:
+        if model and model.startswith(k):
+            return k
+    return model or "unknown"
+
+
+def _read_transcript(path: Path) -> list[dict]:
+    """One entry per API message (streamed blocks repeat the same message id; keep the last)."""
+    msgs = {}
+    for line in path.open():
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        m = e.get("message") or {}
+        if e.get("type") == "assistant" and m.get("usage") and m.get("id"):
+            msgs[m["id"]] = {"t": e.get("timestamp"), "model": m.get("model"), "u": m["usage"]}
+    return list(msgs.values())
+
+
+def cmd_claude(a):
+    """Tally Claude (orchestrator + subagent) tokens and list-price cost per phase and model; log changes."""
+    from datetime import datetime
+
+    session = SESSION_DIR / f"{a.session}.jsonl"
+    sources = [("orchestrator", session)]
+    sources += [("reviewer", f) for f in sorted((SESSION_DIR / a.session / "subagents").glob("agent-*.jsonl"))]
+    events = load_events()
+    starts = [(e["t"], e["phase"]) for e in events if e["type"] == "phase" and e["status"] == "active"]
+
+    def phase_at(ms):
+        ph = "p0"
+        for t, p in starts:
+            if t <= ms:
+                ph = p
+        return ph
+
+    agg = defaultdict(lambda: defaultdict(float))
+    for role, path in sources:
+        for m in _read_transcript(path):
+            ms = int(datetime.fromisoformat(m["t"].replace("Z", "+00:00")).timestamp() * 1000)
+            key = _price_key(m["model"])
+            u = m["u"]
+            cc = u.get("cache_creation") or {}
+            w1h = cc.get("ephemeral_1h_input_tokens", 0) or 0
+            w5m = (u.get("cache_creation_input_tokens", 0) or 0) - w1h
+            r = agg[(phase_at(ms), role, key)]
+            r["messages"] += 1
+            r["input"] += u.get("input_tokens", 0) or 0
+            r["output"] += u.get("output_tokens", 0) or 0
+            r["cache_read"] += u.get("cache_read_input_tokens", 0) or 0
+            r["cache_write"] += w5m + w1h
+            pi, po, pr, pw5, pw1 = CLAUDE_PRICES.get(key, (0, 0, 0, 0, 0))
+            r["cost"] += (r_in := (u.get("input_tokens", 0) or 0)) * pi / 1e6 + (u.get("output_tokens", 0) or 0) * po / 1e6
+            r["cost"] += (u.get("cache_read_input_tokens", 0) or 0) * pr / 1e6 + w5m * pw5 / 1e6 + w1h * pw1 / 1e6
+            del r_in
+    # log only what changed since the last tally
+    last = {}
+    for e in events:
+        if e["type"] == "claude":
+            last[(e["phase"], e["role"], e["model"])] = e
+    changed = 0
+    for (ph, role, model), r in sorted(agg.items()):
+        ev = {"type": "claude", "phase": ph, "role": role, "model": model, "name": CLAUDE_NAMES.get(model, model),
+              "messages": int(r["messages"]), "input": int(r["input"]), "output": int(r["output"]),
+              "cache_read": int(r["cache_read"]), "cache_write": int(r["cache_write"]), "cost": round(r["cost"], 4)}
+        prev = last.get((ph, role, model))
+        if not prev or prev["messages"] != ev["messages"] or prev["output"] != ev["output"]:
+            emit(ev)
+            changed += 1
+    tot = defaultdict(lambda: defaultdict(float))
+    for (ph, role, model), r in agg.items():
+        for k, v in r.items():
+            tot[(role, model)][k] += v
+    print(f"{'role':<13}{'model':<11}{'msgs':>6}{'output':>10}{'cache rd':>12}{'cache wr':>11}{'cost':>10}")
+    for (role, model), r in sorted(tot.items()):
+        print(f"{role:<13}{CLAUDE_NAMES.get(model, model):<11}{int(r['messages']):>6}{int(r['output']):>10,}"
+              f"{int(r['cache_read']):>12,}{int(r['cache_write']):>11,}{r['cost']:>10.2f}")
+    print(f"logged {changed} changed tallies")
+
+
 def main():
     p = argparse.ArgumentParser(prog="swarm")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -313,7 +417,8 @@ def main():
     r.add_argument("--dir", required=True)
     r.add_argument("--prompt"); r.add_argument("--prompt-file")
     r.add_argument("--session"); r.add_argument("--timeout", type=int, default=1800)
-    r.add_argument("--stall", type=int, default=120, help="kill if no output for this many seconds")
+    r.add_argument("--stall", type=int, default=120, help="kill if the run prints nothing at all for this long")
+    r.add_argument("--stall-active", type=int, default=600, help="kill if a started run goes quiet this long")
     r.set_defaults(fn=cmd_run)
 
     s = sub.add_parser("recover"); s.add_argument("phase"); s.add_argument("task")
@@ -345,6 +450,9 @@ def main():
     s = sub.add_parser("crew"); s.add_argument("who", choices=["orchestrator", "reviewer"])
     s.add_argument("state", choices=["busy", "idle"]); s.add_argument("doing", nargs="?")
     s.add_argument("--phase"); s.set_defaults(fn=cmd_crew)
+
+    s = sub.add_parser("claude"); s.add_argument("--session", default="b6c19da9-a3c7-4204-84fa-c4434b1029c2")
+    s.set_defaults(fn=cmd_claude)
 
     sub.add_parser("status").set_defaults(fn=cmd_status)
     s = sub.add_parser("push"); s.add_argument("--all", action="store_true")
