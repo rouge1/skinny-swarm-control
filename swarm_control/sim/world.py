@@ -50,6 +50,11 @@ _UPGRADE_PRICES: dict[str, tuple[int, ...]] = {
     "multishot": config.MULTISHOT_PRICES,
     "speed": config.SPEED_PRICES,
 }
+_UPGRADE_MAX_LEVELS: dict[str, int] = {
+    "fire_rate": config.FIRE_RATE_MAX_LEVEL,
+    "multishot": config.MULTISHOT_MAX_LEVEL,
+    "speed": config.SPEED_MAX_LEVEL,
+}
 _UPGRADE_ACTIONS: dict[str, str] = {
     "buy_fire_rate": "fire_rate",
     "buy_multishot": "multishot",
@@ -121,17 +126,21 @@ class World:
 
     def _next_price(self, key: str) -> int | None:
         """Return the token price of the next ``key`` level, or None when maxed."""
-        prices = _UPGRADE_PRICES[key]
         level = self.upgrades[key]
-        return int(prices[level]) if level < len(prices) else None
+        if level >= _UPGRADE_MAX_LEVELS[key]:
+            return None
+        return int(_UPGRADE_PRICES[key][level])
 
     def _buy(self, key: str) -> None:
         """Spend the next price and raise ``key`` by one level, if allowed."""
-        price = self._next_price(key)
-        if self.status != "won" or price is None or self.tokens < price:
+        level = self.upgrades[key]
+        if self.status != "won" or level >= _UPGRADE_MAX_LEVELS[key]:
+            return
+        price = int(_UPGRADE_PRICES[key][level])
+        if self.tokens < price:
             return
         self.tokens -= price
-        self.upgrades[key] += 1
+        self.upgrades[key] = level + 1
 
     def _launcher_speed(self) -> float:
         """Return the launcher speed in px/s including the speed upgrade."""
