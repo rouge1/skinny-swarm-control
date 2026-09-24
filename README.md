@@ -19,7 +19,7 @@ each; bugs that reach your base line damage you. Agents and bugs annihilate on c
 | Space (hold) | fire agents |
 | P | pause / resume |
 | R | restart the level |
-| 1 / 2 / 3 | buy fire-rate / multishot / speed in the shop |
+| 1 / 2 / 3 (numpad digits work too) | buy fire-rate / multishot / speed in the shop |
 | N | advance to the next level from the shop |
 
 Between levels a SHIPPED! shop overlay appears. Winning a level pays a one-time token reward (40 / 80 /
@@ -41,8 +41,9 @@ Requires Python ≥ 3.12. Dependencies (`pyproject.toml`): `fastapi`, `uvicorn[s
     python3 -m venv .venv && .venv/bin/pip install -e .
     .venv/bin/python -m swarm_control.server        # then open http://127.0.0.1:8000
 
-Tests and lint (from the repo root):
+Tests and lint (from the repo root; `pytest`/`ruff` are dev tools, not game deps):
 
+    .venv/bin/pip install pytest httpx ruff
     .venv/bin/python -m pytest
     .venv/bin/ruff check .
 
@@ -55,12 +56,13 @@ Tests and lint (from the repo root):
 - `swarm_control/server/app.py` — FastAPI app; one `World` per `/ws` connection.
 - `swarm_control/web/` — plain canvas client (`game.js`, no build step): renders state, sends keys.
 - Loop: `World.step(1/60)` at 60 Hz, `snapshot()` sent at 30 Hz over `/ws`.
-- Acceptance contracts for every module live in [`CONTRACTS.md`](CONTRACTS.md) (tests in `tests/`).
+- Acceptance contracts live in [`CONTRACTS.md`](CONTRACTS.md) (data flow, coordinates, phase specs;
+  tests in `tests/`); each module's own docstring is its detailed contract.
 
 ## How the swarm built it
 
 Built by an OpenCode worker swarm — luna, muse, flash — coordinated by a Claude orchestrator across
 5 phases: pool bake-off, world + server, combat/gates/waves, campaign progression, polish + balance +
-demo. Each phase ran in its own git worktree, and every change was reviewed (often by 2+ models) before
-merging to main. See [`tools/README.md`](tools/README.md) for the detailed build log: prompts, ledger,
+demo. Each phase ran in its own git worktree, and every change was reviewed by at least one other
+model before merging to main (some, like the phase 1 and phase 4 bake-offs, by two or more). See [`tools/README.md`](tools/README.md) for the detailed build log: prompts, ledger,
 event records, dashboard, and playtests.
