@@ -13,9 +13,11 @@ Players (all at a fixed dt = 1 / TICK_HZ, for up to 180 s of game time):
     idle        never fires
     stand@X     hold fire without moving, launcher pinned at x = X
 
-Per level and player the report lists the win rate, median/min/max time to a
-result, the median final HP of both bases, the peak unit counts, and a final
-WARNINGS list for balance problems. ``--json`` writes the same data to a file.
+Per level and player the report lists the win rate, timeout rate, median/min/max
+time to a result, the median final HP of both bases, the peak unit counts, and a
+final WARNINGS list for balance problems: an idle/standing win, a sweep loss, a
+sweep timeout, and a later level swept faster than an earlier one. ``--json``
+writes the same data to a file.
 """
 
 import argparse
@@ -43,7 +45,7 @@ class RunResult:
     """Outcome of one scripted run of one player on one level and seed."""
 
     seed: int
-    status: str
+    outcome: str
     seconds: float
     enemy_hp: float
     player_hp: float
@@ -100,9 +102,10 @@ def play(player: Player, level_number: int, seed: int) -> RunResult:
         step += config.TICK_HZ
 
     seconds = min(world.elapsed, MAX_SECONDS)
+    outcome = "timeout" if world.status == "playing" else world.status
     return RunResult(
         seed=seed,
-        status=world.status,
+        outcome=outcome,
         seconds=seconds,
         enemy_hp=world.enemy_hp,
         player_hp=world.player_hp,
@@ -122,11 +125,23 @@ class Summary:
 
     @property
     def wins(self) -> int:
-        return sum(run.status == "won" for run in self.runs)
+        return sum(run.outcome == "won" for run in self.runs)
+
+    @property
+    def timeouts(self) -> int:
+        return sum(run.outcome == "timeout" for run in self.runs)
+
+    @property
+    def losses(self) -> int:
+        return sum(run.outcome == "lost" for run in self.runs)
 
     @property
     def win_rate(self) -> float:
         return self.wins / len(self.runs)
+
+    @property
+    def timeout_rate(self) -> float:
+        return self.timeouts / len(self.runs)
 
     @property
     def times(self) -> list[float]:
@@ -141,7 +156,10 @@ class Summary:
             "player": self.player,
             "runs": len(self.runs),
             "wins": self.wins,
+            "losses": self.losses,
+            "timeouts": self.timeouts,
             "win_rate": self.win_rate,
+            "timeout_rate": self.timeout_rate,
             "time": {
                 "median": statistics.median(times),
                 "min": min(times),
@@ -186,17 +204,23 @@ def find_warnings(summaries: list[Summary]) -> list[str]:
                     f"level {summary.level}: a {summary.player} player won "
                     f"{summary.wins}/{len(summary.runs)} runs"
                 )
-        if summary.player in ("sweep", "sweep-fast") and summary.wins < len(summary.runs):
-            warnings.append(
-                f"level {summary.level}: {summary.player} lost "
-                f"{len(summary.runs) - summary.wins}/{len(summary.runs)} runs"
-            )
+        if summary.player in ("sweep", "sweep-fast"):
+            if summary.losses:
+                warnings.append(
+                    f"level {summary.level}: {summary.player} lost "
+                    f"{summary.losses}/{len(summary.runs)} runs"
+                )
+            if summary.timeouts:
+                warnings.append(
+                    f"level {summary.level}: {summary.player} timed out "
+                    f"{summary.timeouts}/{len(summary.runs)} runs"
+                )
 
     sweep_players = ("sweep", "sweep-fast")
     by_player: dict[str, dict[int, float | None]] = {name: {} for name in sweep_players}
     for summary in summaries:
         if summary.player in sweep_players:
-            win_times = [run.seconds for run in summary.runs if run.status == "won"]
+            win_times = [run.seconds for run in summary.runs if run.outcome == "won"]
             by_player[summary.player][summary.level] = (
                 statistics.median(win_times) if win_times else None
             )
@@ -216,7 +240,7 @@ def find_warnings(summaries: list[Summary]) -> list[str]:
 def print_table(summaries: list[Summary]) -> None:
     """Print the aligned report table to stdout."""
     header = (
-        f"{'Level':>5}  {'Player':<11}  {'Win%':>5}  "
+        f"{'Level':>5}  {'Player':<11}  {'Win%':>5}  {'TO%':>5}  "
         f"{'T-med':>7}  {'T-min':>7}  {'T-max':>7}  "
         f"{'EnemyHP':>8}  {'PlayerHP':>8}  {'BluePk':>7}  {'RedPk':>6}"
     )
@@ -227,6 +251,7 @@ def print_table(summaries: list[Summary]) -> None:
         print(
             f"{summary.level:>5}  {summary.player:<11}  "
             f"{100.0 * summary.win_rate:>5.0f}  "
+            f"{100.0 * summary.timeout_rate:>5.0f}  "
             f"{statistics.median(times):>7.1f}  {min(times):>7.1f}  {max(times):>7.1f}  "
             f"{statistics.median([r.enemy_hp for r in summary.runs]):>8.1f}  "
             f"{statistics.median([r.player_hp for r in summary.runs]):>8.1f}  "
