@@ -112,7 +112,7 @@ def session_metrics(session_id: str, since_ms: int) -> dict:
 def cmd_run(a):
     model = MODELS[a.model]
     prompt = Path(a.prompt_file).read_text() if a.prompt_file else a.prompt
-    kind = "fix" if a.session else "build"
+    kind = a.kind or ("fix" if a.session else "build")
     emit({"type": "task", "phase": a.phase, "task": a.task, "model": a.model,
           "status": "fixing" if kind == "fix" else "working"})
     LOGS.mkdir(parents=True, exist_ok=True)
@@ -150,6 +150,17 @@ def finalize(a, kind, start, wall, code, timed_out, log):
         found = re.findall(r'"sessionID"\s*:\s*"(ses_[A-Za-z0-9]+)"', log.read_text())
         sid = found[0] if found else None
     metrics = session_metrics(sid, start) if sid else {}
+    if getattr(a, "text_out", None):
+        # keep the worker's final written answer (used for OpenCode reviews)
+        texts = []
+        for line in log.read_text().splitlines():
+            try:
+                part = json.loads(line).get("part", {})
+            except ValueError:
+                continue
+            if part.get("type") == "text" and part.get("text"):
+                texts.append(part["text"])
+        Path(a.text_out).write_text(texts[-1] if texts else "")
     rec = {"phase": a.phase, "task": a.task, "model": a.model, "kind": kind, "session": sid,
            "wall_s": wall, "exit": code, "timed_out": timed_out, "log": str(log), **metrics}
     with open(LEDGER, "a") as f:
@@ -419,6 +430,8 @@ def main():
     r.add_argument("--session"); r.add_argument("--timeout", type=int, default=1800)
     r.add_argument("--stall", type=int, default=120, help="kill if the run prints nothing at all for this long")
     r.add_argument("--stall-active", type=int, default=600, help="kill if a started run goes quiet this long")
+    r.add_argument("--text-out", help="save the worker's final text answer to this file")
+    r.add_argument("--kind", help="override run kind (e.g. review)")
     r.set_defaults(fn=cmd_run)
 
     s = sub.add_parser("recover"); s.add_argument("phase"); s.add_argument("task")
