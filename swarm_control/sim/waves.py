@@ -64,9 +64,9 @@ LEVELS: list[dict] = [
             },
         ],
         "waves": [
-            {"t": 0.0, "count": 6, "x": 270, "spread": 300, "speed": 100},
-            {"t": 4.0, "count": 8, "x": 270, "spread": 420, "speed": 110},
-            {"t": 8.0, "count": 10, "x": 270, "spread": 500, "speed": 120},
+            {"t": 0.0, "count": 8, "x": 270, "spread": 300, "speed": 100},
+            {"t": 4.0, "count": 10, "x": 270, "spread": 420, "speed": 110},
+            {"t": 8.0, "count": 12, "x": 270, "spread": 500, "speed": 120},
         ],
     },
     {
@@ -108,7 +108,7 @@ LEVELS: list[dict] = [
     {
         "id": 3,
         "name": "Swarm Cascade",
-        "enemy_hp": 3000.0,
+        "enemy_hp": 6500.0,
         "player_hp": 30.0,
         "reward": 120,
         "gates": [
