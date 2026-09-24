@@ -24,6 +24,28 @@ def test_validate_state_catches_problems():
     del msg["hud"]
     errors = validate_state(msg)
     assert any("hud" in e for e in errors)
-    msg["hud"] = {"blue_count": 0, "red_count": 0, "level": 1, "tokens": 0}
+    msg["hud"] = {
+        "blue_count": 0,
+        "red_count": 0,
+        "level": 1,
+        "tokens": 0,
+        "has_next": True,
+        "upgrades": {"fire_rate": 0, "multishot": 0, "speed": 0},
+        "prices": {"fire_rate": 20, "multishot": 30, "speed": 15},
+        "level_name": "Sandbox",
+    }
     errors = validate_state(msg)
     assert any("multiple of 3" in e for e in errors) and any("dancing" in e for e in errors)
+
+
+def test_validate_state_checks_phase_four_hud_types():
+    msg = World().snapshot()
+    msg["hud"]["has_next"] = 1
+    msg["hud"]["upgrades"]["speed"] = False
+    msg["hud"]["prices"]["fire_rate"] = "20"
+    msg["hud"]["level_name"] = 4
+    errors = validate_state(msg)
+    assert any("has_next" in e for e in errors)
+    assert any("upgrades.speed" in e for e in errors)
+    assert any("prices.fire_rate" in e for e in errors)
+    assert any("level_name" in e for e in errors)

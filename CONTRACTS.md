@@ -12,6 +12,24 @@ The interfaces between modules. Each module's docstring holds its detailed contr
 | `swarm_control/server/app.py` | P2 server | `create_app`, `/`, `/static`, `/ws` | `tests/test_server.py` |
 | `swarm_control/web/` | P2 client | canvas renderer + keyboard | playtest in Chrome |
 
+## Phase 4
+
+`World` owns campaign progression for the life of one browser session. Its `tokens` and
+three upgrade levels persist across `restart`, `next`, and `load_level`. `next` loads the
+next numbered level only while the current status is `won` and another level exists;
+otherwise it has no effect. The shop actions `buy_fire_rate`, `buy_multishot`, and
+`buy_speed` work only while `status == "won"`, and only when the player can pay the
+next price and has not reached the upgrade maximum. Each successful action spends the
+price and increases that upgrade by one. Fire rate multiplies `FIRE_INTERVAL` by 0.85
+per level; multishot adds one agent per level, fanned 12 pixels apart and centered on
+the launcher; speed multiplies launcher speed by 1.25 per level.
+
+The state HUD includes `has_next` (bool), `upgrades` (the three integer upgrade
+levels), `prices` (the next integer price for each upgrade, or `None` when maxed), and
+`level_name` (str), in addition to the existing fields. Winning a level adds its
+integer reward once. After the final level is won, status remains `won`, `has_next`
+is false, and `next` does nothing.
+
 ## Data flow
 
     browser (web/)  --input/action JSON-->  server (/ws)  --set_input/action-->  World
