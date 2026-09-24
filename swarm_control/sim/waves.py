@@ -35,6 +35,8 @@ validate_level(level) -> list[str]   problems with a level dict; empty means val
 """
 
 import copy
+import math
+import numbers
 
 import numpy as np
 
@@ -45,67 +47,125 @@ LEVELS: list[dict] = [
     {
         "id": 1,
         "name": "First Contact",
-        "enemy_hp": 30.0,
-        "player_hp": 100.0,
+        "enemy_hp": 80.0,
+        "player_hp": 20.0,
         "reward": 10,
         "gates": [
-            {"x": 120, "y": 360, "w": 100, "h": 30, "op": "mul", "value": 2, "label": "x2 fork"},
-            {"x": 320, "y": 560, "w": 100, "h": 30, "op": "add", "value": 4, "label": "+4 subagents"},
+            {"x": 80, "y": 300, "w": 120, "h": 30, "op": "mul", "value": 2, "vx": 40, "label": "x2 fork"},
+            {
+                "x": 340,
+                "y": 600,
+                "w": 120,
+                "h": 30,
+                "op": "add",
+                "value": 4,
+                "vx": -35,
+                "label": "+4 subagents",
+            },
         ],
         "waves": [
-            {"t": 1.0, "count": 6, "x": 270, "spread": 260, "speed": 60},
-            {"t": 4.0, "count": 6, "x": 270, "spread": 400, "speed": 70},
-            {"t": 8.0, "count": 8, "x": 270, "spread": 460, "speed": 80},
+            {"t": 0.0, "count": 6, "x": 270, "spread": 300, "speed": 100},
+            {"t": 4.0, "count": 8, "x": 270, "spread": 420, "speed": 110},
+            {"t": 8.0, "count": 10, "x": 270, "spread": 500, "speed": 120},
         ],
     },
     {
         "id": 2,
         "name": "Parallel Front",
-        "enemy_hp": 65.0,
-        "player_hp": 100.0,
+        "enemy_hp": 200.0,
+        "player_hp": 25.0,
         "reward": 25,
         "gates": [
-            {"x": 60, "y": 340, "w": 100, "h": 30, "op": "mul", "value": 2, "label": "x2 fork"},
-            {"x": 300, "y": 500, "w": 120, "h": 30, "op": "add", "value": 5, "label": "+5 subagents"},
-            {"x": 160, "y": 680, "w": 100, "h": 30, "op": "mul", "value": 3, "label": "x3 worktree"},
+            {"x": 40, "y": 280, "w": 110, "h": 28, "op": "mul", "value": 2, "vx": 45, "label": "x2 fork"},
+            {
+                "x": 380,
+                "y": 470,
+                "w": 120,
+                "h": 28,
+                "op": "add",
+                "value": 5,
+                "vx": -40,
+                "label": "+5 subagents",
+            },
+            {
+                "x": 200,
+                "y": 680,
+                "w": 110,
+                "h": 28,
+                "op": "mul",
+                "value": 3,
+                "vx": 30,
+                "label": "x3 worktree",
+            },
         ],
         "waves": [
-            {"t": 1.0, "count": 8, "x": 200, "spread": 300, "speed": 65},
-            {"t": 3.5, "count": 10, "x": 340, "spread": 340, "speed": 75},
-            {"t": 7.0, "count": 12, "x": 270, "spread": 480, "speed": 85, "hp": 1.5},
-            {"t": 11.0, "count": 15, "x": 270, "spread": 520, "speed": 95},
+            {"t": 0.0, "count": 8, "x": 200, "spread": 320, "speed": 100},
+            {"t": 3.5, "count": 10, "x": 340, "spread": 380, "speed": 110},
+            {"t": 7.0, "count": 10, "x": 200, "spread": 480, "speed": 120},
+            {"t": 11.0, "count": 12, "x": 340, "spread": 520, "speed": 130},
         ],
     },
     {
         "id": 3,
         "name": "Swarm Cascade",
-        "enemy_hp": 120.0,
-        "player_hp": 100.0,
+        "enemy_hp": 450.0,
+        "player_hp": 30.0,
         "reward": 50,
         "gates": [
-            {"x": 60, "y": 300, "w": 110, "h": 30, "op": "mul", "value": 2, "label": "x2 fork"},
-            {"x": 300, "y": 440, "w": 130, "h": 30, "op": "add", "value": 6, "label": "+6 branch clones"},
-            {"x": 140, "y": 600, "w": 120, "h": 30, "op": "mul", "value": 3, "label": "x3 worktree"},
-            {"x": 330, "y": 740, "w": 110, "h": 30, "op": "add", "value": 5, "label": "+5 parallel agents"},
+            {"x": 40, "y": 260, "w": 110, "h": 26, "op": "mul", "value": 2, "vx": 50, "label": "x2 fork"},
+            {
+                "x": 390,
+                "y": 420,
+                "w": 120,
+                "h": 26,
+                "op": "add",
+                "value": 6,
+                "vx": -45,
+                "label": "+6 branch clones",
+            },
+            {
+                "x": 180,
+                "y": 580,
+                "w": 110,
+                "h": 26,
+                "op": "mul",
+                "value": 3,
+                "vx": 40,
+                "label": "x3 worktree",
+            },
+            {
+                "x": 360,
+                "y": 740,
+                "w": 110,
+                "h": 26,
+                "op": "add",
+                "value": 5,
+                "vx": -35,
+                "label": "+5 parallel agents",
+            },
         ],
         "waves": [
-            {"t": 0.5, "count": 15, "x": 270, "spread": 400, "speed": 70},
-            {"t": 3.0, "count": 18, "x": 180, "spread": 440, "speed": 80},
-            {"t": 6.5, "count": 22, "x": 360, "spread": 520, "speed": 90, "hp": 2.0},
-            {"t": 10.0, "count": 25, "x": 270, "spread": 540, "speed": 100, "kind": 1},
+            {"t": 0.0, "count": 12, "x": 270, "spread": 360, "speed": 105},
+            {"t": 3.0, "count": 14, "x": 170, "spread": 440, "speed": 115},
+            {"t": 6.5, "count": 16, "x": 370, "spread": 500, "speed": 125},
+            {"t": 10.0, "count": 18, "x": 270, "spread": 540, "speed": 135},
         ],
     },
 ]
 
+_GATE_MIN_Y = float(config.ENEMY_HIT_Y)
+_GATE_MAX_Y = float(config.LAUNCHER_Y - config.MUZZLE_OFFSET)
+_GATE_MIN_H = config.AGENT_SPEED / config.TICK_HZ
 
-def _is_number(value: object) -> bool:
-    """Return True for real numbers (bools excluded)."""
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+def _finite_number(value: object) -> bool:
+    """Return True for finite real numbers (bools and NaN/inf excluded)."""
+    return isinstance(value, numbers.Real) and not isinstance(value, bool) and math.isfinite(value)
 
 
-def _is_int(value: object) -> bool:
+def _finite_int(value: object) -> bool:
     """Return True for integers (bools excluded)."""
-    return isinstance(value, int) and not isinstance(value, bool)
+    return isinstance(value, numbers.Integral) and not isinstance(value, bool)
 
 
 def _wave_problems(wave: object, where: str) -> list[str]:
@@ -115,27 +175,27 @@ def _wave_problems(wave: object, where: str) -> list[str]:
     problems: list[str] = []
     if "t" not in wave:
         problems.append(f"{where}: missing 't'")
-    elif not _is_number(wave["t"]) or wave["t"] < 0:
-        problems.append(f"{where}: 't' must be a number >= 0")
+    elif not _finite_number(wave["t"]) or wave["t"] < 0:
+        problems.append(f"{where}: 't' must be a finite number >= 0")
     if "count" not in wave:
         problems.append(f"{where}: missing 'count'")
-    elif not _is_int(wave["count"]) or wave["count"] < 1:
+    elif not _finite_int(wave["count"]) or wave["count"] < 1:
         problems.append(f"{where}: 'count' must be an int >= 1")
     if "x" not in wave:
         problems.append(f"{where}: missing 'x'")
-    elif not _is_number(wave["x"]):
-        problems.append(f"{where}: 'x' must be a number")
+    elif not _finite_number(wave["x"]):
+        problems.append(f"{where}: 'x' must be a finite number")
     if "spread" not in wave:
         problems.append(f"{where}: missing 'spread'")
-    elif not _is_number(wave["spread"]) or wave["spread"] < 0:
-        problems.append(f"{where}: 'spread' must be a number >= 0")
+    elif not _finite_number(wave["spread"]) or wave["spread"] < 0:
+        problems.append(f"{where}: 'spread' must be a finite number >= 0")
     if "speed" not in wave:
         problems.append(f"{where}: missing 'speed'")
-    elif not _is_number(wave["speed"]) or wave["speed"] <= 0:
-        problems.append(f"{where}: 'speed' must be a number > 0")
-    if "hp" in wave and (not _is_number(wave["hp"]) or wave["hp"] <= 0):
-        problems.append(f"{where}: 'hp' must be a number > 0")
-    if "kind" in wave and (not _is_int(wave["kind"]) or not -128 <= wave["kind"] <= 127):
+    elif not _finite_number(wave["speed"]) or wave["speed"] <= 0:
+        problems.append(f"{where}: 'speed' must be a finite number > 0")
+    if "hp" in wave and (not _finite_number(wave["hp"]) or wave["hp"] <= 0):
+        problems.append(f"{where}: 'hp' must be a finite number > 0")
+    if "kind" in wave and (not _finite_int(wave["kind"]) or not -128 <= wave["kind"] <= 127):
         problems.append(f"{where}: 'kind' must be an int that fits in int8")
     return problems
 
@@ -148,24 +208,28 @@ def _gate_problems(gate: object, where: str) -> list[str]:
     for key in ("x", "y", "w", "h"):
         if key not in gate:
             problems.append(f"{where}: missing '{key}'")
-        elif not _is_number(gate[key]):
-            problems.append(f"{where}: '{key}' must be a number")
+        elif not _finite_number(gate[key]):
+            problems.append(f"{where}: '{key}' must be a finite number")
     if not problems:
         x, y, w, h = gate["x"], gate["y"], gate["w"], gate["h"]
         if w <= 0 or h <= 0:
             problems.append(f"{where}: 'w' and 'h' must be > 0")
-        if x < 0 or y < 0 or x + w > config.FIELD_W or y + h > config.FIELD_H:
+        elif x < 0 or x + w > config.FIELD_W:
             problems.append(f"{where}: gate sticks out of the field")
+        elif h < _GATE_MIN_H:
+            problems.append(f"{where}: 'h' is too thin for agents to trigger")
+        elif not (_GATE_MIN_Y < y and y + h < _GATE_MAX_Y):
+            problems.append(f"{where}: gate is outside the band agents can reach")
     if gate.get("op") not in ("mul", "add"):
         problems.append(f"{where}: 'op' must be 'mul' or 'add'")
     if "value" not in gate:
         problems.append(f"{where}: missing 'value'")
-    elif not _is_int(gate["value"]) or gate["value"] < 1:
+    elif not _finite_int(gate["value"]) or gate["value"] < 1:
         problems.append(f"{where}: 'value' must be an int >= 1")
     if not isinstance(gate.get("label"), str) or not gate.get("label"):
         problems.append(f"{where}: 'label' must be a non-empty string")
-    if "vx" in gate and not _is_number(gate["vx"]):
-        problems.append(f"{where}: 'vx' must be a number")
+    if "vx" in gate and not _finite_number(gate["vx"]):
+        problems.append(f"{where}: 'vx' must be a finite number")
     return problems
 
 
@@ -173,7 +237,7 @@ class WaveSpawner:
     """Spawns level waves into a UnitPool as their scheduled time arrives."""
 
     def __init__(self, waves: list[dict], rng) -> None:
-        waves = list(waves)
+        waves = copy.deepcopy(list(waves))
         problems: list[str] = []
         for i, wave in enumerate(waves):
             problems.extend(_wave_problems(wave, f"waves[{i}]"))
@@ -195,31 +259,41 @@ class WaveSpawner:
 
     def update(self, t: float, red: UnitPool, spawn_y: float = config.BUG_SPAWN_Y) -> int:
         """Spawn every wave due at time ``t`` and return how many bugs were spawned."""
+        if not _finite_number(t):
+            raise ValueError("t must be a finite number")
+        if not _finite_number(spawn_y):
+            raise ValueError("spawn_y must be a finite number")
         t = float(t)
+        spawn_y = float(spawn_y)
         spawned = 0
         while self._next < len(self._waves) and self._waves[self._next]["t"] <= t:
             wave = self._waves[self._next]
-            count = int(wave["count"])
-            half = float(wave["spread"]) / 2.0
-            x = self._rng.uniform(wave["x"] - half, wave["x"] + half, count)
-            x = np.clip(x, config.UNIT_RADIUS, config.FIELD_W - config.UNIT_RADIUS)
-            y = spawn_y + self._rng.uniform(0.0, 30.0, count)
-            slots = red.spawn_many(
-                x,
-                y,
-                vx=0.0,
-                vy=float(wave["speed"]),
-                kind=int(wave.get("kind", 0)),
-                hp=float(wave.get("hp", 1.0)),
-            )
-            spawned += int(slots.size)
+            free = red.capacity - red.count
+            count = min(int(wave["count"]), max(free, 0))
+            if count > 0:
+                half = float(wave["spread"]) / 2.0
+                x = self._rng.uniform(wave["x"] - half, wave["x"] + half, count)
+                x = np.clip(x, config.UNIT_RADIUS, config.FIELD_W - config.UNIT_RADIUS)
+                y = spawn_y + self._rng.uniform(0.0, 30.0, count)
+                slots = red.spawn_many(
+                    x,
+                    y,
+                    vx=0.0,
+                    vy=float(wave["speed"]),
+                    kind=int(wave.get("kind", 0)),
+                    hp=float(wave.get("hp", 1.0)),
+                )
+                spawned += int(slots.size)
             self._next += 1
         return spawned
 
 
 def get_level(n: int) -> dict:
     """Return a deep copy of level ``n`` (1-based). Raise KeyError if it does not exist."""
-    if not _is_int(n) or n < 1 or n > len(LEVELS):
+    if not _finite_int(n):
+        raise KeyError(n)
+    n = int(n)
+    if n < 1 or n > len(LEVELS):
         raise KeyError(n)
     return copy.deepcopy(LEVELS[n - 1])
 
@@ -230,16 +304,16 @@ def validate_level(level: object) -> list[str]:
         return ["level must be a dict"]
     problems: list[str] = []
 
-    if not _is_int(level.get("id")) or level.get("id", 0) < 1:
+    if not _finite_int(level.get("id")) or level.get("id", 0) < 1:
         problems.append("'id' must be an int >= 1")
     if not isinstance(level.get("name"), str) or not level.get("name"):
         problems.append("'name' must be a non-empty string")
     for key in ("enemy_hp", "player_hp"):
         if key not in level:
             problems.append(f"missing '{key}'")
-        elif not _is_number(level[key]) or level[key] <= 0:
-            problems.append(f"'{key}' must be a number > 0")
-    if not _is_int(level.get("reward")) or level.get("reward", -1) < 0:
+        elif not _finite_number(level[key]) or level[key] <= 0:
+            problems.append(f"'{key}' must be a finite number > 0")
+    if not _finite_int(level.get("reward")) or level.get("reward", -1) < 0:
         problems.append("'reward' must be an int >= 0")
 
     if "gates" not in level:
