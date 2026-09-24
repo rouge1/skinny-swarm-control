@@ -10,7 +10,8 @@ Server -> client
 Client -> server
     {"type": "input", "left": bool, "right": bool, "fire": bool}
         The full current key state. Sent whenever it changes.
-    {"type": "action", "action": "pause" | "resume" | "restart"}
+    {"type": "action", "action": "pause" | "resume" | "restart" |
+      "next" | "buy_fire_rate" | "buy_multishot" | "buy_speed"}
 
 Units travel as flat integer lists to keep messages small:
     "blue": [x0, y0, kind0, x1, y1, kind1, ...]
@@ -23,7 +24,15 @@ from typing import Any
 import numpy as np
 
 STATUSES = ("playing", "paused", "won", "lost")
-ACTIONS = ("pause", "resume", "restart")
+ACTIONS = (
+    "pause",
+    "resume",
+    "restart",
+    "next",
+    "buy_fire_rate",
+    "buy_multishot",
+    "buy_speed",
+)
 
 # field name -> python type(s) of the value in a "state" message
 STATE_FIELDS: dict[str, type | tuple[type, ...]] = {
@@ -35,7 +44,7 @@ STATE_FIELDS: dict[str, type | tuple[type, ...]] = {
     "red": list,  # packed bugs, see pack_units
     "gates": list,  # [{"x","y","w","h": float, "op": "mul"|"add", "value": int, "label": str}]
     "bases": dict,  # {"enemy_hp": float, "enemy_hp_max": float, "player_hp": float, "player_hp_max": float}
-    "hud": dict,  # {"blue_count": int, "red_count": int, "level": int, "tokens": int}
+    "hud": dict,  # progression, level name, counts and upgrade prices
 }
 
 
@@ -79,8 +88,27 @@ def validate_state(msg: dict[str, Any]) -> list[str]:
         if not isinstance(msg["bases"].get(key), int | float):
             errors.append(f"bases.{key} must be a number")
     for key in ("blue_count", "red_count", "level", "tokens"):
-        if not isinstance(msg["hud"].get(key), int):
+        if not isinstance(msg["hud"].get(key), int) or isinstance(msg["hud"].get(key), bool):
             errors.append(f"hud.{key} must be an int")
+    if not isinstance(msg["hud"].get("has_next"), bool):
+        errors.append("hud.has_next must be a bool")
+    if not isinstance(msg["hud"].get("level_name"), str):
+        errors.append("hud.level_name must be a str")
+    upgrades = msg["hud"].get("upgrades")
+    if not isinstance(upgrades, dict):
+        errors.append("hud.upgrades must be a dict")
+    else:
+        for key in ("fire_rate", "multishot", "speed"):
+            if not isinstance(upgrades.get(key), int) or isinstance(upgrades.get(key), bool):
+                errors.append(f"hud.upgrades.{key} must be an int")
+    prices = msg["hud"].get("prices")
+    if not isinstance(prices, dict):
+        errors.append("hud.prices must be a dict")
+    else:
+        for key in ("fire_rate", "multishot", "speed"):
+            value = prices.get(key)
+            if value is not None and (not isinstance(value, int) or isinstance(value, bool)):
+                errors.append(f"hud.prices.{key} must be an int or None")
     for i, g in enumerate(msg["gates"]):
         for key in ("x", "y", "w", "h"):
             if not isinstance(g.get(key), int | float):

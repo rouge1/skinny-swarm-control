@@ -33,3 +33,15 @@ ENEMY_HIT_Y = 110.0  # agents at or above this line hit the fortress (1 damage e
 BUG_SPAWN_Y = 120.0  # bugs enter just below the fortress
 GATE_SCATTER = 12.0  # copies from a gate appear within this many px of their parent
 MAX_GATES = 32  # a uint32 bit mask tracks which gates each agent has passed
+
+# --- phase 4: campaign upgrades
+FIRE_RATE_FACTOR = 0.85
+FIRE_RATE_MAX_LEVEL = 4
+FIRE_RATE_PRICES = (20, 40, 80, 160)
+MULTISHOT_AGENTS_PER_LEVEL = 1
+MULTISHOT_SPACING = 12.0
+MULTISHOT_MAX_LEVEL = 2
+MULTISHOT_PRICES = (30, 90)
+LAUNCHER_SPEED_FACTOR = 1.25
+SPEED_MAX_LEVEL = 3
+SPEED_PRICES = (15, 30, 60)
