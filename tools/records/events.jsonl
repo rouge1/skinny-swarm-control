@@ -1,0 +1,115 @@
+{"t": 1790203200314, "type": "phase", "phase": "p0", "status": "active"}
+{"t": 1790203200341, "type": "crew", "phase": "p0", "who": "orchestrator", "state": "busy", "doing": "Setting up the repo, ops tooling and this dashboard"}
+{"t": 1790203200367, "type": "note", "phase": "p0", "who": "orchestrator", "text": "Swarm Control kicked off. Workers: GPT-5.6 Luna, Muse Spark 1.3 Contributor, DeepSeek V4.1 Flash."}
+{"t": 1790203200394, "type": "task", "phase": "p0", "task": "repo", "status": "queued", "title": "Repo, venv, test harness"}
+{"t": 1790203200421, "type": "task", "phase": "p0", "task": "contracts", "status": "queued", "title": "Protocol + module contracts"}
+{"t": 1790203200449, "type": "task", "phase": "p0", "task": "acceptance", "status": "queued", "title": "Acceptance tests per module"}
+{"t": 1790203200477, "type": "task", "phase": "p0", "task": "rules", "status": "queued", "title": "Worker rules (AGENTS.md)"}
+{"t": 1790203200504, "type": "task", "phase": "p0", "task": "repo", "status": "working"}
+{"t": 1790203258862, "type": "task", "phase": "p0", "task": "repo", "status": "merged"}
+{"t": 1790203258890, "type": "task", "phase": "p0", "task": "contracts", "status": "working"}
+{"t": 1790203468474, "type": "task", "phase": "p0", "task": "contracts", "status": "merged"}
+{"t": 1790203468503, "type": "task", "phase": "p0", "task": "rules", "status": "merged"}
+{"t": 1790203468534, "type": "task", "phase": "p0", "task": "acceptance", "status": "merged", "note": "24 pool tests verified against a private reference"}
+{"t": 1790203485820, "type": "note", "phase": "p0", "who": "orchestrator", "text": "P0 committed: contracts, protocol, 24 pool acceptance tests, AGENTS.md"}
+{"t": 1790203485857, "type": "phase", "phase": "p0", "status": "done"}
+{"t": 1790203494636, "type": "phase", "phase": "p1", "status": "active"}
+{"t": 1790203494665, "type": "task", "phase": "p1", "task": "pool", "status": "queued", "model": "luna", "title": "UnitPool (bake-off)"}
+{"t": 1790203494693, "type": "task", "phase": "p1", "task": "pool", "status": "queued", "model": "muse", "title": "UnitPool (bake-off)"}
+{"t": 1790203494720, "type": "task", "phase": "p1", "task": "pool", "status": "queued", "model": "flash", "title": "UnitPool (bake-off)"}
+{"t": 1790203494748, "type": "crew", "phase": "p1", "who": "orchestrator", "state": "busy", "doing": "Running the bake-off: three models, one spec, 24 tests"}
+{"t": 1790203611693, "type": "task", "phase": "p1", "task": "pool", "model": "muse", "status": "working"}
+{"t": 1790203611693, "type": "task", "phase": "p1", "task": "pool", "model": "flash", "status": "working"}
+{"t": 1790203611693, "type": "task", "phase": "p1", "task": "pool", "model": "luna", "status": "working"}
+{"t": 1790203818328, "type": "run", "phase": "p1", "task": "pool", "model": "luna", "kind": "build", "session": "ses_f2f8cb1d4ffeoy0ufDKGhcIOMm", "wall_s": 137.2, "exit": 0, "timed_out": false, "cost": 0.009445, "tokens_in": 24, "tokens_out": 2381, "tokens_reasoning": 644, "cache_read": 90326, "model_s": 135.7, "messages": 8, "files_changed": 0}
+{"t": 1790203818328, "type": "task", "phase": "p1", "task": "pool", "model": "luna", "status": "review"}
+{"t": 1790203819107, "type": "run", "phase": "p1", "task": "pool", "model": "flash", "kind": "build", "session": "ses_f2f8cb1d8ffeUu2Oj71AoYTpwH", "wall_s": 96.6, "exit": 0, "timed_out": false, "cost": 0.006123, "tokens_in": 19904, "tokens_out": 2607, "tokens_reasoning": 2156, "cache_read": 93184, "model_s": 95.0, "messages": 7, "files_changed": 0}
+{"t": 1790203819107, "type": "task", "phase": "p1", "task": "pool", "model": "flash", "status": "review"}
+{"t": 1790203870141, "type": "tests", "phase": "p1", "task": "pool", "model": "luna", "passed": 24, "failed": 0}
+{"t": 1790203870451, "type": "tests", "phase": "p1", "task": "pool", "model": "flash", "passed": 24, "failed": 0}
+{"t": 1790203926066, "type": "tests", "phase": "p1", "task": "pool", "model": "muse", "passed": 24, "failed": 0}
+{"t": 1790203939656, "type": "run", "phase": "p1", "task": "pool", "model": "muse", "kind": "build", "session": "ses_f2f8cb1d9ffeEojgMaQbuVKUFF", "wall_s": 303.8, "exit": 0, "timed_out": false, "cost": 0.012728, "tokens_in": 79063, "tokens_out": 4652, "tokens_reasoning": 17189, "cache_read": 226576, "model_s": 302.2, "messages": 16, "files_changed": 0}
+{"t": 1790203939656, "type": "task", "phase": "p1", "task": "pool", "model": "muse", "status": "review"}
+{"t": 1790203946869, "type": "crew", "phase": "p1", "who": "reviewer", "state": "busy", "doing": "Blind-reviewing three UnitPool submissions (A/B/C)"}
+{"t": 1790203946899, "type": "crew", "phase": "p1", "who": "orchestrator", "state": "busy", "doing": "Waiting on the blind review, preparing Phase 2 specs"}
+{"t": 1790204119772, "type": "review", "phase": "p1", "task": "pool", "model": "luna", "verdict": "pass", "findings": 6, "wall_s": 127.0, "summary": "Only one with no correctness issue; O(capacity) single spawn, style nits"}
+{"t": 1790204119800, "type": "review", "phase": "p1", "task": "pool", "model": "muse", "verdict": "changes", "findings": 6, "wall_s": 127.0, "summary": "Silently accepts mismatched x/y and per-unit array lengths"}
+{"t": 1790204119828, "type": "review", "phase": "p1", "task": "pool", "model": "flash", "verdict": "changes", "findings": 5, "wall_s": 127.0, "summary": "HIGH: clear() corrupts free list -> duplicate slots, count drift"}
+{"t": 1790204166552, "type": "score", "phase": "p1", "task": "pool", "model": "luna", "score": 84.0, "summary": "Winner: correct under every probe"}
+{"t": 1790204166580, "type": "score", "phase": "p1", "task": "pool", "model": "flash", "score": 83.0, "summary": "Fastest + cheapest, but high-severity clear() bug blocks merge"}
+{"t": 1790204166608, "type": "score", "phase": "p1", "task": "pool", "model": "muse", "score": 72.0, "summary": "Correct state, lax input validation, slowest"}
+{"t": 1790204166637, "type": "task", "phase": "p1", "task": "pool", "status": "dropped", "model": "flash", "note": "clear() free-list bug"}
+{"t": 1790204166667, "type": "task", "phase": "p1", "task": "pool", "status": "dropped", "model": "muse", "note": "lax validation"}
+{"t": 1790204166694, "type": "crew", "phase": "p1", "who": "reviewer", "state": "idle", "doing": ""}
+{"t": 1790204200613, "type": "task", "phase": "p1", "task": "pool", "model": "luna", "status": "fixing"}
+{"t": 1790204283854, "type": "run", "phase": "p1", "task": "pool", "model": "luna", "kind": "fix", "session": "ses_f2f8cb1d4ffeoy0ufDKGhcIOMm", "wall_s": 82.5, "exit": 0, "timed_out": false, "cost": 0.004914, "tokens_in": 15, "tokens_out": 1169, "tokens_reasoning": 706, "cache_read": 88510, "model_s": 81.1, "messages": 5, "files_changed": 0}
+{"t": 1790204283854, "type": "task", "phase": "p1", "task": "pool", "model": "luna", "status": "review"}
+{"t": 1790204476649, "type": "task", "phase": "p1", "task": "pool", "status": "merged", "model": "luna", "note": "merged after 1 fix round"}
+{"t": 1790204476689, "type": "note", "phase": "p1", "who": "orchestrator", "text": "Bake-off: Luna 84, Flash 83, Muse 72. Flash was fastest and cheapest but had a high-severity bug."}
+{"t": 1790204476724, "type": "phase", "phase": "p1", "status": "done"}
+{"t": 1790204476760, "type": "phase", "phase": "p2", "status": "active"}
+{"t": 1790204476809, "type": "task", "phase": "p2", "task": "world", "status": "queued", "model": "luna", "title": "World core (launcher, firing, flight)"}
+{"t": 1790204476855, "type": "task", "phase": "p2", "task": "server", "status": "queued", "model": "muse", "title": "FastAPI + WebSocket game loop"}
+{"t": 1790204476901, "type": "task", "phase": "p2", "task": "client", "status": "queued", "model": "flash", "title": "Canvas client + keyboard"}
+{"t": 1790204476941, "type": "crew", "phase": "p2", "who": "orchestrator", "state": "busy", "doing": "Phase 2 running: 3 workers in parallel"}
+{"t": 1790204487266, "type": "task", "phase": "p2", "task": "server", "model": "muse", "status": "working"}
+{"t": 1790204487266, "type": "task", "phase": "p2", "task": "client", "model": "flash", "status": "working"}
+{"t": 1790204487267, "type": "task", "phase": "p2", "task": "world", "model": "luna", "status": "working"}
+{"t": 1790204611974, "type": "run", "phase": "p2", "task": "world", "model": "luna", "kind": "build", "session": "ses_f2f7f5584ffewp2qNfGwoOlKWm", "wall_s": 124.0, "exit": 0, "timed_out": false, "cost": 0.010508, "tokens_in": 27, "tokens_out": 1850, "tokens_reasoning": 716, "cache_read": 125782, "model_s": 122.3, "messages": 9, "files_changed": 0}
+{"t": 1790204611974, "type": "task", "phase": "p2", "task": "world", "model": "luna", "status": "review"}
+{"t": 1790204659657, "type": "run", "phase": "p2", "task": "server", "model": "muse", "kind": "build", "session": "ses_f2f7f558dffenhh3d4uaWedewW", "wall_s": 171.7, "exit": 0, "timed_out": false, "cost": 0.006331, "tokens_in": 39085, "tokens_out": 2974, "tokens_reasoning": 7828, "cache_read": 130922, "model_s": 170.0, "messages": 10, "files_changed": 0}
+{"t": 1790204659657, "type": "task", "phase": "p2", "task": "server", "model": "muse", "status": "review"}
+{"t": 1790205048458, "type": "run", "phase": "p2", "task": "client", "model": "flash", "kind": "build", "session": "ses_f2f7f5587ffe2IXsdjEXnn3e0p", "wall_s": 560.5, "exit": 0, "timed_out": false, "cost": 0.019439, "tokens_in": 48287, "tokens_out": 7459, "tokens_reasoning": 11018, "cache_read": 370048, "model_s": 558.7, "messages": 16, "files_changed": 0}
+{"t": 1790205048458, "type": "task", "phase": "p2", "task": "client", "model": "flash", "status": "review"}
+{"t": 1790205089893, "type": "tests", "phase": "p2", "task": "world", "model": "luna", "passed": 42, "failed": 0}
+{"t": 1790205089922, "type": "tests", "phase": "p2", "task": "server", "model": "muse", "passed": 11, "failed": 0}
+{"t": 1790205089966, "type": "crew", "phase": "p2", "who": "reviewer", "state": "busy", "doing": "Reviewing Phase 2: world, server, client (3 reviewers in parallel)"}
+{"t": 1790205293115, "type": "review", "phase": "p2", "task": "client", "model": "flash", "verdict": "changes", "findings": 8, "wall_s": 0, "summary": "Overlay text overlaps (line-height); modifier keys leak; render loop can die on bad state"}
+{"t": 1790205293146, "type": "review", "phase": "p2", "task": "world", "model": "luna", "verdict": "changes", "findings": 8, "wall_s": 0, "summary": "Fire cooldown drops overshoot (-11% rate); tap-fire bypasses cooldown; restart drops held keys"}
+{"t": 1790205293175, "type": "task", "phase": "p2", "task": "client", "status": "fixing", "model": "flash"}
+{"t": 1790205293203, "type": "task", "phase": "p2", "task": "world", "status": "fixing", "model": "luna"}
+{"t": 1790205353453, "type": "task", "phase": "p2", "task": "client", "model": "flash", "status": "fixing"}
+{"t": 1790205353453, "type": "task", "phase": "p2", "task": "world", "model": "luna", "status": "fixing"}
+{"t": 1790205353484, "type": "crew", "phase": "p2", "who": "reviewer", "state": "busy", "doing": "Reviewing the server branch (Muse)"}
+{"t": 1790206131184, "type": "review", "phase": "p2", "task": "server", "model": "muse", "verdict": "changes", "findings": 5, "wall_s": 795.0, "summary": "HIGH: slow step starves the event loop (server wedges); nested JSON kills the input reader"}
+{"t": 1790206131215, "type": "crew", "phase": "p2", "who": "reviewer", "state": "idle", "doing": ""}
+{"t": 1790206146984, "type": "task", "phase": "p2", "task": "server", "model": "muse", "status": "fixing"}
+{"t": 1790206307465, "type": "run", "phase": "p2", "task": "server", "model": "muse", "kind": "fix", "session": "ses_f2f7f558dffenhh3d4uaWedewW", "wall_s": 159.6, "exit": 0, "timed_out": false, "cost": 0.003757, "tokens_in": 13504, "tokens_out": 2468, "tokens_reasoning": 8372, "cache_read": 119206, "model_s": 158.1, "messages": 6, "files_changed": 0}
+{"t": 1790206307465, "type": "task", "phase": "p2", "task": "server", "model": "muse", "status": "review"}
+{"t": 1790206351469, "type": "tests", "phase": "p2", "task": "server", "model": "muse", "passed": 11, "failed": 0}
+{"t": 1790206351501, "type": "review", "phase": "p2", "task": "server", "model": "muse", "verdict": "pass", "findings": 0, "wall_s": 0, "summary": "Orchestrator re-probe: slow step no longer wedges server; reader survives nested JSON"}
+{"t": 1790206351534, "type": "note", "phase": "p2", "who": "orchestrator", "text": "Playwright playtest of the pre-fix build: gameplay works; pause overlay text overlaps as the reviewer predicted"}
+{"t": 1790206854330, "type": "run", "phase": "p2", "task": "client", "model": "flash", "kind": "fix", "session": "ses_f2f7f5587ffe2IXsdjEXnn3e0p", "wall_s": 1500.0, "exit": -1, "timed_out": true, "cost": 0.0, "tokens_in": 0, "tokens_out": 0, "tokens_reasoning": 0, "cache_read": 0, "model_s": 0.0, "messages": 0, "files_changed": 0}
+{"t": 1790206854330, "type": "task", "phase": "p2", "task": "client", "model": "flash", "status": "failed", "note": "timed out"}
+{"t": 1790206854335, "type": "run", "phase": "p2", "task": "world", "model": "luna", "kind": "fix", "session": "ses_f2f7f5584ffewp2qNfGwoOlKWm", "wall_s": 1500.0, "exit": -1, "timed_out": true, "cost": 0.0, "tokens_in": 0, "tokens_out": 0, "tokens_reasoning": 0, "cache_read": 0, "model_s": 0.0, "messages": 0, "files_changed": 0}
+{"t": 1790206854335, "type": "task", "phase": "p2", "task": "world", "model": "luna", "status": "failed", "note": "timed out"}
+{"t": 1790206962271, "type": "note", "phase": "p2", "who": "orchestrator", "text": "Luna + Flash fix runs hung silently for 25 min (no output); added a stall watchdog and retrying one at a time"}
+{"t": 1790206971468, "type": "task", "phase": "p2", "task": "world", "model": "luna", "status": "fixing"}
+{"t": 1790207120362, "type": "run", "phase": "p2", "task": "world", "model": "luna", "kind": "fix", "session": "ses_f2f7f5584ffewp2qNfGwoOlKWm", "wall_s": 148.0, "exit": 0, "timed_out": false, "cost": 0.014099, "tokens_in": 21, "tokens_out": 2198, "tokens_reasoning": 1964, "cache_read": 135738, "model_s": 145.4, "messages": 7, "files_changed": 0}
+{"t": 1790207120362, "type": "task", "phase": "p2", "task": "world", "model": "luna", "status": "review"}
+{"t": 1790207120402, "type": "task", "phase": "p2", "task": "client", "model": "flash", "status": "fixing"}
+{"t": 1790207339191, "type": "run", "phase": "p2", "task": "client", "model": "flash", "kind": "fix", "session": "ses_f2f7f5587ffe2IXsdjEXnn3e0p", "wall_s": 218.0, "exit": 0, "timed_out": false, "cost": 0.008003, "tokens_in": 5490, "tokens_out": 5082, "tokens_reasoning": 2360, "cache_read": 904704, "model_s": 215.9, "messages": 20, "files_changed": 0}
+{"t": 1790207339191, "type": "task", "phase": "p2", "task": "client", "model": "flash", "status": "review"}
+{"t": 1790207504775, "type": "tests", "phase": "p2", "task": "world", "model": "luna", "passed": 42, "failed": 0}
+{"t": 1790207504807, "type": "review", "phase": "p2", "task": "world", "model": "luna", "verdict": "pass", "findings": 0, "wall_s": 0, "summary": "Orchestrator re-probe: 84/84 shots in 10s, tap-fire capped, restart keeps keys"}
+{"t": 1790207504839, "type": "review", "phase": "p2", "task": "client", "model": "flash", "verdict": "pass", "findings": 0, "wall_s": 0, "summary": "Playwright: pause overlay readable, no console errors"}
+{"t": 1790207504871, "type": "task", "phase": "p2", "task": "world", "status": "merged", "model": "luna"}
+{"t": 1790207504905, "type": "task", "phase": "p2", "task": "server", "status": "merged", "model": "muse"}
+{"t": 1790207504941, "type": "task", "phase": "p2", "task": "client", "status": "merged", "model": "flash"}
+{"t": 1790207504973, "type": "note", "phase": "p2", "who": "orchestrator", "text": "Phase 2 merged: 50 tests green; Playwright playtest recorded"}
+{"t": 1790207505007, "type": "phase", "phase": "p2", "status": "done"}
+{"t": 1790207505044, "type": "crew", "phase": "p2", "who": "orchestrator", "state": "busy", "doing": "Writing Phase 3 acceptance tests (gates, bugs, collisions, bases)"}
+{"t": 1790207733456, "type": "phase", "phase": "p3", "status": "active"}
+{"t": 1790207733489, "type": "task", "phase": "p3", "task": "combat", "status": "queued", "model": "luna", "title": "Combat: collisions + base hits"}
+{"t": 1790207733522, "type": "task", "phase": "p3", "task": "gates", "status": "queued", "model": "muse", "title": "Multiplier gates"}
+{"t": 1790207733555, "type": "task", "phase": "p3", "task": "waves", "status": "queued", "model": "flash", "title": "Bug waves + 3 levels"}
+{"t": 1790207733589, "type": "task", "phase": "p3", "task": "world", "status": "queued", "model": "luna", "title": "World wiring: level, gates, waves, combat, win/lose"}
+{"t": 1790207733622, "type": "task", "phase": "p3", "task": "hud", "status": "queued", "model": "flash", "title": "Client: gate labels, bug art, win/lose screens"}
+{"t": 1790207733656, "type": "crew", "phase": "p3", "who": "orchestrator", "state": "busy", "doing": "Phase 3 running: combat, gates, waves in parallel"}
+{"t": 1790207744157, "type": "task", "phase": "p3", "task": "combat", "model": "luna", "status": "working"}
+{"t": 1790207749160, "type": "task", "phase": "p3", "task": "gates", "model": "muse", "status": "working"}
+{"t": 1790207754163, "type": "task", "phase": "p3", "task": "waves", "model": "flash", "status": "working"}
+{"t": 1790207811274, "type": "run", "phase": "p3", "task": "waves", "model": "flash", "kind": "build", "session": "ses_f2f4d7bbeffe9K6fCuBp7RSyq2", "wall_s": 56.0, "exit": 0, "timed_out": false, "cost": 0.006382, "tokens_in": 18379, "tokens_out": 1211, "tokens_reasoning": 4614, "cache_read": 43520, "model_s": 54.0, "messages": 4, "files_changed": 0}
+{"t": 1790207811275, "type": "task", "phase": "p3", "task": "waves", "model": "flash", "status": "review"}
+{"t": 1790207939112, "type": "run", "phase": "p3", "task": "combat", "model": "luna", "kind": "build", "session": "ses_f2f4da333ffe2HPmaGgaOQ5KKQ", "wall_s": 194.0, "exit": 0, "timed_out": false, "cost": 0.029975, "tokens_in": 63, "tokens_out": 5303, "tokens_reasoning": 4380, "cache_read": 486339, "model_s": 190.6, "messages": 21, "files_changed": 0}
+{"t": 1790207939112, "type": "task", "phase": "p3", "task": "combat", "model": "luna", "status": "review"}
