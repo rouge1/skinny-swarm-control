@@ -15,6 +15,9 @@ CONTRACT (acceptance tests: tests/test_world.py, added per phase):
 The world wires together the launcher, gates, waves, combat and bases. Each
 playing step follows the simulation order used by the game, and result states
 freeze the simulation until a restart.
+
+    world.load_level(level) -> None; deep-copy and start a new level while
+    retaining tokens, held input and the unit pools.
 """
 
 import copy
@@ -33,12 +36,26 @@ from swarm_control.sim.waves import WaveSpawner, get_level
 class World:
     def __init__(self, seed: int = 0, level: dict | None = None) -> None:
         self.seed = seed
-        self._level_template = copy.deepcopy(level if level is not None else {})
+        sandbox = {
+            "id": 0,
+            "name": "Sandbox",
+            "enemy_hp": 100,
+            "player_hp": 100,
+            "reward": 0,
+            "gates": [],
+            "waves": [],
+        }
+        self._level_template = copy.deepcopy(level if level is not None else sandbox)
         self.blue = UnitPool(config.BLUE_CAPACITY)
         self.red = UnitPool(config.RED_CAPACITY)
         self.passed = np.zeros(config.BLUE_CAPACITY, dtype=np.uint32)
         self._input = (False, False, False)
         self.tokens = 0
+        self._reset()
+
+    def load_level(self, level: dict) -> None:
+        """Load a copied level and reset it while retaining progress and input."""
+        self._level_template = copy.deepcopy(level)
         self._reset()
 
     def _reset(self) -> None:
@@ -144,11 +161,11 @@ class World:
         self._cull()
         self.tick += 1
         self.elapsed += dt
-        if self.enemy_hp == 0.0:
+        if self.player_hp == 0.0:
+            self.status = "lost"
+        elif self.enemy_hp == 0.0:
             self.status = "won"
             self.tokens += int(self.level.get("reward", 0))
-        elif self.player_hp == 0.0:
-            self.status = "lost"
 
     def snapshot(self) -> dict:
         blue_indices = self.blue.active_indices()
