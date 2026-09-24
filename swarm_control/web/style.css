@@ -102,6 +102,70 @@ canvas#game {
   color: #9fb0c9;
 }
 
+#overlay .shop {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  width: min(92%, 480px);
+  margin-top: 0.55em;
+}
+
+#overlay .shop-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  padding: 0.32em 0.7em;
+  border: 1px solid #2a3c61;
+  border-radius: 9px;
+  background: rgba(20, 32, 55, 0.9);
+  font-size: 0.5em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #dbe6f7;
+}
+
+#overlay .shop-row.afford {
+  border-color: #5ac878;
+  box-shadow: 0 0 14px rgba(90, 200, 120, 0.25);
+}
+
+#overlay .shop-row.dim {
+  opacity: 0.4;
+}
+
+#overlay .shop-row.max {
+  opacity: 0.55;
+}
+
+#overlay .shop-key {
+  flex: none;
+  min-width: 1.5em;
+  padding: 0.05em 0.35em;
+  border: 1px solid #26385a;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #16233c;
+  color: #dbe6f7;
+  text-align: center;
+}
+
+#overlay .shop-name {
+  flex: 1;
+  text-align: left;
+}
+
+#overlay .shop-lvl {
+  color: #9fb0c9;
+  white-space: nowrap;
+}
+
+#overlay .shop-price {
+  min-width: 3.2em;
+  text-align: right;
+  color: #ffd479;
+  white-space: nowrap;
+}
+
 #legend {
   display: flex;
   flex-wrap: wrap;

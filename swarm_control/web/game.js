@@ -25,7 +25,30 @@ var SEND_HZ = 30;
 
 var FLASH_MS = 120; // fortress bright flash after it takes damage
 var SHAKE_MS = 150; // field shake after the player's base takes damage
-var MOCK_WIN_SECONDS = 20; // mock mode declares a win after this long
+
+// --- phase 4: campaign upgrades (mirrors swarm_control/config.py)
+var FIRE_RATE_FACTOR = 0.85;
+var LAUNCHER_SPEED_FACTOR = 1.25;
+var MULTISHOT_SPACING = 12;
+
+// Shop catalogue shared by the overlay and the mock.
+var UPGRADES = [
+  { key: "fire_rate", num: "1", label: "FIRE RATE", max: 4 },
+  { key: "multishot", num: "2", label: "MULTISHOT", max: 2 },
+  { key: "speed", num: "3", label: "SPEED", max: 3 },
+];
+
+// Mock campaign: three levels so the shop can be tried with no server.
+var MOCK_LEVELS = [
+  { name: "First Contact", enemyHp: 100, playerHp: 100, seconds: 20, reward: 10 },
+  { name: "Parallel Front", enemyHp: 140, playerHp: 100, seconds: 25, reward: 25 },
+  { name: "Swarm Cascade", enemyHp: 180, playerHp: 100, seconds: 30, reward: 50 },
+];
+var MOCK_PRICES = {
+  fire_rate: [20, 40, 80, 160],
+  multishot: [30, 90],
+  speed: [15, 30, 60],
+};
 
 // ---------------------------------------------------------------------------
 // DOM and canvas
@@ -88,7 +111,16 @@ var DEFAULT_STATE = {
   red: [],
   gates: [],
   bases: { enemy_hp: 100, enemy_hp_max: 100, player_hp: 100, player_hp_max: 100 },
-  hud: { blue_count: 0, red_count: 0, level: 1, tokens: 0 },
+  hud: {
+    blue_count: 0,
+    red_count: 0,
+    level: 1,
+    tokens: 0,
+    has_next: true,
+    upgrades: { fire_rate: 0, multishot: 0, speed: 0 },
+    prices: { fire_rate: 20, multishot: 30, speed: 15 },
+    level_name: "Sandbox",
+  },
 };
 
 // Damage feedback timers, and the HP/token baselines used for flashing and the
@@ -230,6 +262,16 @@ function onKeyDown(e) {
     else if (st === "paused") doAction("resume");
   } else if (code === "KeyR") {
     doAction("restart");
+  } else if (code === "KeyN") {
+    if (latest && latest.status === "won" && latest.hud && latest.hud.has_next) {
+      doAction("next");
+    }
+  } else if (code === "Digit1" || code === "Numpad1") {
+    shopBuy("fire_rate");
+  } else if (code === "Digit2" || code === "Numpad2") {
+    shopBuy("multishot");
+  } else if (code === "Digit3" || code === "Numpad3") {
+    shopBuy("speed");
   }
 }
 
@@ -247,11 +289,47 @@ function doAction(name) {
     if (name === "pause" && sim.status === "playing") sim.status = "paused";
     else if (name === "resume" && sim.status === "paused") sim.status = "playing";
     else if (name === "restart") resetMock();
+    else if (name === "next") mockNext();
+    else if (name.indexOf("buy_") === 0) mockBuy(name.slice(4));
     return;
   }
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ type: "action", action: name }));
   }
+}
+
+// Buy the named upgrade from the shop only when it is affordable and not maxed.
+function shopBuy(kind) {
+  if (!latest || latest.status !== "won") return;
+  var hud = latest.hud || {};
+  if (!hud.has_next || !hud.upgrades || !hud.prices) return;
+  var level = hud.upgrades[kind] || 0;
+  var price = hud.prices[kind];
+  if (price === null || price === undefined || hud.tokens < price) return;
+  for (var i = 0; i < UPGRADES.length; i++) {
+    if (UPGRADES[i].key === kind && level < UPGRADES[i].max) doAction("buy_" + kind);
+  }
+}
+
+function mockNext() {
+  if (sim.status !== "won" || sim.level >= MOCK_LEVELS.length) return;
+  sim.level += 1;
+  startMockLevel();
+  latest = mockSnapshot();
+  haveState = true;
+}
+
+function mockBuy(kind) {
+  if (sim.status !== "won") return;
+  var prices = MOCK_PRICES[kind];
+  var level = sim.upgrades[kind];
+  if (!prices || level >= prices.length) return;
+  var price = prices[level];
+  if (sim.tokens < price) return;
+  sim.tokens -= price;
+  sim.upgrades[kind] = level + 1;
+  latest = mockSnapshot();
+  haveState = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -279,9 +357,11 @@ var sim = {
   bugTimer: 0.5,
   level: 1,
   tokens: 0,
+  upgrades: { fire_rate: 0, multishot: 0, speed: 0 },
 };
 
-function resetMock() {
+function startMockLevel() {
+  var data = MOCK_LEVELS[sim.level - 1] || MOCK_LEVELS[0];
   sim.tick = 0;
   sim.time = 0;
   sim.status = "playing";
@@ -290,12 +370,14 @@ function resetMock() {
   sim.bluePassed = [];
   sim.red = [];
   sim.gates = makeMockGates();
-  sim.enemyHp = 100;
-  sim.playerHp = 100;
+  sim.enemyHp = data.enemyHp;
+  sim.playerHp = data.playerHp;
   sim.fireTimer = 0;
   sim.bugTimer = 0.5;
-  sim.level = 1;
-  sim.tokens = 0;
+}
+
+function resetMock() {
+  startMockLevel();
   latest = mockSnapshot();
   haveState = true;
 }
@@ -305,18 +387,24 @@ function mockStep(dt) {
   sim.tick += 1;
   sim.time += dt;
 
-  if (keys.left && !keys.right) sim.launcherX -= LAUNCHER_SPEED * dt;
-  else if (keys.right && !keys.left) sim.launcherX += LAUNCHER_SPEED * dt;
+  var speed = LAUNCHER_SPEED * Math.pow(LAUNCHER_SPEED_FACTOR, sim.upgrades.speed);
+  if (keys.left && !keys.right) sim.launcherX -= speed * dt;
+  else if (keys.right && !keys.left) sim.launcherX += speed * dt;
   sim.launcherX = Math.max(
     LAUNCHER_MARGIN,
     Math.min(fieldW - LAUNCHER_MARGIN, sim.launcherX)
   );
 
   sim.fireTimer -= dt;
+  var shots = 1 + sim.upgrades.multishot;
+  var fireInterval = FIRE_INTERVAL * Math.pow(FIRE_RATE_FACTOR, sim.upgrades.fire_rate);
   if (keys.fire && sim.fireTimer <= 0 && sim.blue.length < BLUE_CAPACITY * 3) {
-    sim.blue.push(sim.launcherX, LAUNCHER_Y - 20, 0);
-    sim.bluePassed.push(0);
-    sim.fireTimer = FIRE_INTERVAL;
+    for (var sh = 0; sh < shots && sim.blue.length < BLUE_CAPACITY * 3; sh++) {
+      var off = (sh - (shots - 1) / 2) * MULTISHOT_SPACING;
+      sim.blue.push(sim.launcherX + off, LAUNCHER_Y - 20, 0);
+      sim.bluePassed.push(0);
+    }
+    sim.fireTimer = fireInterval;
   }
 
   // Moving gates bounce off the field walls (same rule as sim/gates.py).
@@ -388,8 +476,13 @@ function mockStep(dt) {
   }
   sim.red = nr;
 
-  if (sim.time >= MOCK_WIN_SECONDS || sim.enemyHp <= 0) sim.status = "won";
-  else if (sim.playerHp <= 0) sim.status = "lost";
+  var data = MOCK_LEVELS[sim.level - 1] || MOCK_LEVELS[0];
+  if (sim.time >= data.seconds || sim.enemyHp <= 0) {
+    sim.status = "won";
+    sim.tokens += data.reward;
+  } else if (sim.playerHp <= 0) {
+    sim.status = "lost";
+  }
 }
 
 // Round a packed unit list to whole field pixels for the wire format.
@@ -399,7 +492,14 @@ function roundUnits(flat) {
   return out;
 }
 
+function mockPrice(kind) {
+  var prices = MOCK_PRICES[kind];
+  var level = sim.upgrades[kind];
+  return level < prices.length ? prices[level] : null;
+}
+
 function mockSnapshot() {
+  var data = MOCK_LEVELS[sim.level - 1] || MOCK_LEVELS[0];
   return {
     type: "state",
     tick: sim.tick,
@@ -410,15 +510,27 @@ function mockSnapshot() {
     gates: sim.gates,
     bases: {
       enemy_hp: sim.enemyHp,
-      enemy_hp_max: 100,
+      enemy_hp_max: data.enemyHp,
       player_hp: sim.playerHp,
-      player_hp_max: 100,
+      player_hp_max: data.playerHp,
     },
     hud: {
       blue_count: sim.blue.length / 3,
       red_count: sim.red.length / 3,
       level: sim.level,
       tokens: sim.tokens,
+      has_next: sim.level < MOCK_LEVELS.length,
+      upgrades: {
+        fire_rate: sim.upgrades.fire_rate,
+        multishot: sim.upgrades.multishot,
+        speed: sim.upgrades.speed,
+      },
+      prices: {
+        fire_rate: mockPrice("fire_rate"),
+        multishot: mockPrice("multishot"),
+        speed: mockPrice("speed"),
+      },
+      level_name: data.name,
     },
   };
 }
@@ -493,7 +605,7 @@ function drawBase(s) {
   ctx.lineTo(fieldW, PLAYER_BASE_Y);
   ctx.stroke();
   var b = s.bases;
-  drawHpBar(90, PLAYER_BASE_Y + 4, fieldW - 180, 14, b.player_hp, b.player_hp_max, "#4a90d9");
+  drawHpBar(170, PLAYER_BASE_Y + 4, 200, 14, b.player_hp, b.player_hp_max, "#4a90d9");
 }
 
 function roundRectPath(x, y, w, h, r) {
@@ -627,20 +739,36 @@ function drawDamageGlow(now) {
 }
 
 function drawHud(s) {
+  var hud = s.hud || {};
   ctx.fillStyle = "rgba(0,0,0,0.5)";
   ctx.fillRect(0, 0, fieldW, 26);
   ctx.font = "bold 14px system-ui, sans-serif";
   ctx.textBaseline = "middle";
   ctx.textAlign = "left";
   ctx.fillStyle = "#6fb3ff";
-  ctx.fillText("AGENTS " + s.hud.blue_count, 12, 13);
+  ctx.fillText("AGENTS " + hud.blue_count, 12, 13);
   ctx.fillStyle = "#ff6b6b";
-  ctx.fillText("BUGS " + s.hud.red_count, 150, 13);
+  ctx.fillText("BUGS " + hud.red_count, 150, 13);
   ctx.fillStyle = "#e8eef7";
-  ctx.fillText("LV " + s.hud.level, 260, 13);
+  ctx.textAlign = "center";
+  ctx.fillText(hud.level_name || "LV " + hud.level, fieldW / 2, 13);
   ctx.fillStyle = "#ffd479";
   ctx.textAlign = "right";
-  ctx.fillText("TOKENS " + s.hud.tokens, fieldW - 12, 13);
+  ctx.fillText("TOKENS " + hud.tokens, fieldW - 12, 13);
+
+  if (hud.upgrades) {
+    var u = hud.upgrades;
+    ctx.fillStyle = "#9fb0c9";
+    ctx.font = "bold 10px system-ui, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(
+      "FIRE " + (u.fire_rate || 0) +
+        " · MULTI " + (u.multishot || 0) +
+        " · SPEED " + (u.speed || 0),
+      fieldW - 8,
+      PLAYER_BASE_Y + 10
+    );
+  }
 }
 
 function render(now) {
@@ -671,11 +799,71 @@ function render(now) {
 // ---------------------------------------------------------------------------
 var overlayKey = null;
 
+function shopRowHtml(up, hud) {
+  var level = (hud.upgrades && hud.upgrades[up.key]) || 0;
+  var price = (hud.prices || {})[up.key];
+  if (price === undefined) price = null;
+  var maxed = price === null;
+  var afford = !maxed && hud.tokens >= price;
+  var cls = "shop-row" + (maxed ? " max" : afford ? " afford" : " dim");
+  return (
+    '<div class="' + cls + '">' +
+    '<span class="shop-key">' + up.num + "</span>" +
+    '<span class="shop-name">' + up.label + "</span>" +
+    '<span class="shop-lvl">Lv ' + level + " / " + up.max + "</span>" +
+    '<span class="shop-price">' + (maxed ? "MAX" : price) + "</span>" +
+    "</div>"
+  );
+}
+
+function shopHtml(hud) {
+  var rows = "";
+  for (var i = 0; i < UPGRADES.length; i++) rows += shopRowHtml(UPGRADES[i], hud);
+  return (
+    '<div class="end">' +
+    '<div class="end-title">SHIPPED!</div>' +
+    '<div class="end-line">' + (hud.level_name || "Level cleared") + "</div>" +
+    '<div class="end-tokens">TOKENS ' + (hud.tokens || 0) + "</div>" +
+    '<div class="shop">' + rows + "</div>" +
+    '<div class="end-hint">1 / 2 / 3 buy · N next level · R replay</div>' +
+    "</div>"
+  );
+}
+
+function campaignHtml(hud) {
+  var u = hud.upgrades || {};
+  return (
+    '<div class="end">' +
+    '<div class="end-title">CAMPAIGN COMPLETE</div>' +
+    '<div class="end-line">Every production line is bug-free</div>' +
+    '<div class="end-tokens">TOKENS ' + (hud.tokens || 0) + "</div>" +
+    '<div class="end-line">Fire rate Lv ' + (u.fire_rate || 0) +
+      " · Multishot Lv " + (u.multishot || 0) +
+      " · Speed Lv " + (u.speed || 0) + "</div>" +
+    '<div class="end-hint">Press R to replay</div>' +
+    "</div>"
+  );
+}
+
 function updateOverlay() {
   if (!overlay) return;
   var key;
-  if (!haveState) key = "connecting";
-  else key = latest ? latest.status : "playing";
+  if (!haveState) {
+    key = "connecting";
+  } else if (!latest) {
+    key = "playing";
+  } else {
+    var h = latest.hud || {};
+    if (latest.status === "won" && h.upgrades) {
+      var u = h.upgrades;
+      // Include tokens/upgrades so a buy refreshes the shop while it is open.
+      key = "won|" + (h.has_next ? 1 : 0) + "|" + (h.tokens || 0) + "|" +
+        (u.fire_rate || 0) + "," + (u.multishot || 0) + "," + (u.speed || 0) + "|" +
+        (h.level_name || "");
+    } else {
+      key = latest.status;
+    }
+  }
   if (key === overlayKey) return;
   overlayKey = key;
 
@@ -686,15 +874,20 @@ function updateOverlay() {
   } else if (key === "paused") {
     overlay.textContent = "PAUSED\nPress P to resume";
     overlay.classList.add("show");
-  } else if (key === "won") {
-    var gained = latest ? Math.max(0, latest.hud.tokens - levelStartTokens) : 0;
-    overlay.innerHTML =
-      '<div class="end">' +
-      '<div class="end-title">SHIPPED!</div>' +
-      '<div class="end-line">Production is bug-free</div>' +
-      '<div class="end-tokens">+' + gained + " tokens</div>" +
-      '<div class="end-hint">Press R to play again</div>' +
-      "</div>";
+  } else if (latest && latest.status === "won") {
+    var hud = latest.hud || {};
+    if (hud.upgrades) {
+      overlay.innerHTML = hud.has_next ? shopHtml(hud) : campaignHtml(hud);
+    } else {
+      var gained = Math.max(0, (hud.tokens || 0) - levelStartTokens);
+      overlay.innerHTML =
+        '<div class="end">' +
+        '<div class="end-title">SHIPPED!</div>' +
+        '<div class="end-line">Production is bug-free</div>' +
+        '<div class="end-tokens">+' + gained + " tokens</div>" +
+        '<div class="end-hint">Press R to play again</div>' +
+        "</div>";
+    }
     overlay.classList.add("show", "won");
   } else if (key === "lost") {
     overlay.innerHTML =
