@@ -10,7 +10,7 @@ Server -> client
 Client -> server
     {"type": "input", "left": bool, "right": bool, "fire": bool}
         The full current key state. Sent whenever it changes.
-     {"type": "action", "action": "pause" | "resume" | "restart" |
+    {"type": "action", "action": "pause" | "resume" | "restart" |
       "next" | "buy_fire_rate" | "buy_multishot" | "buy_speed"}
 
 Units travel as flat integer lists to keep messages small:
@@ -88,7 +88,7 @@ def validate_state(msg: dict[str, Any]) -> list[str]:
         if not isinstance(msg["bases"].get(key), int | float):
             errors.append(f"bases.{key} must be a number")
     for key in ("blue_count", "red_count", "level", "tokens"):
-        if not isinstance(msg["hud"].get(key), int):
+        if not isinstance(msg["hud"].get(key), int) or isinstance(msg["hud"].get(key), bool):
             errors.append(f"hud.{key} must be an int")
     if not isinstance(msg["hud"].get("has_next"), bool):
         errors.append("hud.has_next must be a bool")

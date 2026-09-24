@@ -49,3 +49,19 @@ def test_validate_state_checks_phase_four_hud_types():
     assert any("upgrades.speed" in e for e in errors)
     assert any("prices.fire_rate" in e for e in errors)
     assert any("level_name" in e for e in errors)
+
+
+def test_validate_state_requires_each_phase_four_hud_field():
+    for field in ("has_next", "upgrades", "prices", "level_name"):
+        msg = World().snapshot()
+        del msg["hud"][field]
+        errors = validate_state(msg)
+        assert any(field in error for error in errors)
+
+
+def test_validate_state_rejects_bool_hud_counts_and_level():
+    for field in ("blue_count", "red_count", "level", "tokens"):
+        msg = World().snapshot()
+        msg["hud"][field] = True
+        errors = validate_state(msg)
+        assert any(f"hud.{field}" in error for error in errors)
