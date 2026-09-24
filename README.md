@@ -16,11 +16,15 @@ each; bugs that reach your base line damage you. Agents and bugs annihilate on c
 | Key | Action |
 |---|---|
 | ← / → or A / D | move the launcher |
-| Space (hold) | fire agents |
+| Space | start the game / fire agents (hold) |
 | P | pause / resume |
 | R | restart the level |
 | 1 / 2 / 3 (numpad digits work too) | buy fire-rate / multishot / speed in the shop |
 | N | advance to the next level from the shop |
+| H or ? | open / close the help overlay (Escape closes it too) |
+| M | toggle motion effects (hit-flash, particles, screen shake) |
+
+A title screen shows before level 1 — press Space to start.
 
 Between levels a SHIPPED! shop overlay appears. Winning a level pays a one-time token reward (40 / 80 /
 120 for levels 1–3); tokens and upgrades persist for the whole session, across restarts. Each shop row
