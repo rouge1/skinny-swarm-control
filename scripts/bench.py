@@ -91,6 +91,15 @@ def _time_wrapper(accum: dict[str, float], key: str, func: Callable[..., Any]) -
 def bench_load(load: int, seconds: float, seed: int) -> dict[str, Any]:
     """Step one load level and return timing statistics (seconds converted to ms)."""
     world = make_world(load, seed)
+    spawned_blue = world.blue.count
+    spawned_red = world.red.count
+    spawned_total = spawned_blue + spawned_red
+    if spawned_total < load:
+        print(
+            f"warning: requested load {load} capped to {spawned_total} "
+            f"(blue {spawned_blue}, red {spawned_red}) by pool capacity",
+            file=sys.stderr,
+        )
     steps = max(1, round(seconds * config.TICK_HZ))
     accum = {
         "launcher_fire": 0.0,
@@ -158,9 +167,10 @@ def bench_load(load: int, seconds: float, seed: int) -> dict[str, Any]:
     ms = step_times * 1000.0
     snap_ms = snap_times * 1000.0
     return {
-        "load": load,
-        "blue": half_count(load),
-        "red": load - half_count(load),
+        "load": spawned_total,
+        "requested_load": load,
+        "blue": spawned_blue,
+        "red": spawned_red,
         "steps": steps,
         "step_ms": {
             "mean": float(np.mean(ms)),
@@ -179,18 +189,14 @@ def bench_load(load: int, seconds: float, seed: int) -> dict[str, Any]:
     }
 
 
-def half_count(load: int) -> int:
-    """Return the blue share of a total load."""
-    return load // 2
-
-
-def print_table(rows: list[dict[str, Any]]) -> None:
+def print_table(rows: list[dict[str, Any]], seconds: float) -> None:
     """Print an aligned text table of benchmark results."""
     header = (
         f"{'load':>6} {'mean':>8} {'p50':>8} {'p95':>8} {'max':>8} {'%budg':>7} "
         f"{'move':>8} {'gates':>8} {'combat':>8} {'base/cl':>8} {'snap':>8}"
     )
-    print("Per-step time (ms) over >= 2 s of game time; budget = 60 Hz (16.7 ms).")
+    measured = rows[0]["steps"] / config.TICK_HZ if rows else seconds
+    print(f"Per-step time (ms) over {measured:g} s of game time; budget = 60 Hz (16.7 ms).")
     print(header)
     print("-" * len(header))
     for row in rows:
@@ -236,7 +242,7 @@ def main() -> None:
     loads = parse_loads(args.loads)
     seconds = float(args.seconds)
     rows = [bench_load(load, seconds, args.seed) for load in loads]
-    print_table(rows)
+    print_table(rows, seconds)
     if args.profile:
         run_profile(max(loads), seconds, args.seed)
     if args.json:
