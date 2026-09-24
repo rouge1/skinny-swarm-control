@@ -49,7 +49,7 @@ LEVELS: list[dict] = [
         "name": "First Contact",
         "enemy_hp": 1000.0,
         "player_hp": 20.0,
-        "reward": 10,
+        "reward": 40,
         "gates": [
             {"x": 80, "y": 300, "w": 120, "h": 30, "op": "mul", "value": 2, "vx": 40, "label": "x2 fork"},
             {
@@ -74,7 +74,7 @@ LEVELS: list[dict] = [
         "name": "Parallel Front",
         "enemy_hp": 2000.0,
         "player_hp": 25.0,
-        "reward": 25,
+        "reward": 80,
         "gates": [
             {"x": 40, "y": 280, "w": 110, "h": 28, "op": "mul", "value": 2, "vx": 45, "label": "x2 fork"},
             {
@@ -110,7 +110,7 @@ LEVELS: list[dict] = [
         "name": "Swarm Cascade",
         "enemy_hp": 3000.0,
         "player_hp": 30.0,
-        "reward": 50,
+        "reward": 120,
         "gates": [
             {"x": 40, "y": 260, "w": 110, "h": 26, "op": "mul", "value": 2, "vx": 50, "label": "x2 fork"},
             {
