@@ -24,7 +24,14 @@ var RED_CAPACITY = 4000;
 var SEND_HZ = 30;
 
 var FLASH_MS = 120; // fortress bright flash after it takes damage
+var PLAYER_FLASH_MS = 150; // player base flash after a bug reaches it
 var SHAKE_MS = 150; // field shake after the player's base takes damage
+
+// --- phase 5: juice
+var GATE_NEAR_MIN = 1; // agents entering a gate box that counts as a gate event
+var GATE_BURST_COOLDOWN = 180; // ms between bursts on the same gate
+var PARTICLE_MAX = 160; // fixed pool: bursts never allocate unboundedly
+var PARTICLE_GRAVITY = 320; // px/s^2 pulling sparks down
 
 // --- phase 4: campaign upgrades (mirrors swarm_control/config.py)
 var FIRE_RATE_FACTOR = 0.85;
@@ -56,6 +63,7 @@ var MOCK_PRICES = {
 var canvas = document.getElementById("game");
 var ctx = canvas.getContext("2d");
 var overlay = document.getElementById("overlay");
+var menu = document.getElementById("menu");
 var legend = document.getElementById("legend");
 
 var fieldW = FIELD_W;
@@ -102,6 +110,13 @@ var latest = null; // most recent valid "state" message
 var haveState = false;
 var mockMode = new URLSearchParams(window.location.search).get("mock") === "1";
 
+// Phase 5 screens and juice. The title is up until Space is pressed, the help
+// overlay can cover the game at any time, and "M" toggles every juice effect.
+var started = false;
+var helpOpen = false;
+var motion = true;
+var resumePending = false; // hiding PAUSED while the start-of-game resume is in flight
+
 var DEFAULT_STATE = {
   type: "state",
   tick: 0,
@@ -136,9 +151,11 @@ var levelStartTokens = 0;
 function trackDamage(s, now) {
   var b = s.bases;
   if (!b) return;
-  if (prevEnemyHp !== null && b.enemy_hp < prevEnemyHp) enemyFlashUntil = now + FLASH_MS;
-  if (prevPlayerHp !== null && b.player_hp < prevPlayerHp) playerFlashUntil = now + SHAKE_MS;
-  prevEnemyHp = b.enemy_hp;
+  if (motion && prevEnemyHp !== null && b.enemy_hp < prevEnemyHp) enemyFlashUntil = now + FLASH_MS;
+  if (motion && prevPlayerHp !== null && b.player_hp < prevPlayerHp) {
+    playerFlashUntil = now + PLAYER_FLASH_MS;
+  }
+  prevEnemyHp = b.enemy_hp; // always updated so re-enabling motion cannot flash stale damage
   prevPlayerHp = b.player_hp;
 }
 
@@ -149,6 +166,29 @@ function trackLevel(s) {
   }
   prevLevel = s.hud.level;
   prevTick = s.tick;
+}
+
+// Re-seed every feedback baseline from the newest snapshot. Called when the
+// title is dismissed so the first live frame cannot flash damage or burst at a
+// gate that was crossed before play began.
+function resetTracking(s) {
+  prevEnemyHp = null;
+  prevPlayerHp = null;
+  enemyFlashUntil = 0;
+  playerFlashUntil = 0;
+  prevTick = -1;
+  prevLevel = -1;
+  gateInit = false;
+  if (!s) return;
+  if (s.bases) {
+    prevEnemyHp = s.bases.enemy_hp;
+    prevPlayerHp = s.bases.player_hp;
+  }
+  if (s.hud) {
+    prevLevel = s.hud.level;
+    prevTick = s.tick;
+    levelStartTokens = s.hud.tokens;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +210,11 @@ function connect() {
   socket.onopen = function () {
     sentInput = { left: false, right: false, fire: false };
     sendInput(true);
+    // The world starts stepping the moment the socket opens. Keep it paused
+    // behind the title so play begins on frame one instead of mid-level.
+    if (!started && socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "action", action: "pause" }));
+    }
   };
   socket.onmessage = function (ev) {
     var msg;
@@ -249,6 +294,35 @@ function releaseKeys() {
 function onKeyDown(e) {
   if (e.ctrlKey || e.metaKey || e.altKey) return; // ignore shortcuts
   var code = e.code;
+
+  // Help toggles at any time, including from the title screen.
+  if (code === "KeyH" || code === "Slash") {
+    e.preventDefault();
+    if (e.repeat) return;
+    setHelp(!helpOpen);
+    return;
+  }
+  if (helpOpen) {
+    if (code === "Escape") {
+      e.preventDefault();
+      setHelp(false);
+    }
+    return; // help is modal: swallow movement, fire and actions while it is open
+  }
+  if (code === "KeyM") {
+    if (e.repeat) return;
+    motion = !motion;
+    if (!motion) clearParticles();
+    return;
+  }
+  if (!started) {
+    if (code === "Space") {
+      e.preventDefault();
+      startGame();
+    }
+    return; // nothing else happens before the title is dismissed
+  }
+
   if (KEYS.has(code)) e.preventDefault();
   if (e.repeat) return; // ignore auto-repeat
   if (KEYS.has(code)) {
@@ -282,6 +356,25 @@ function onKeyUp(e) {
     held.delete(code);
     syncKeys();
   }
+}
+
+function startGame() {
+  started = true;
+  menuKey = null; // hide the title
+  resetTracking(latest); // fresh baselines for the first live frame
+  if (mockMode) return; // the local sim unfreezes on its own
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ type: "action", action: "resume" }));
+  }
+  resumePending = true; // do not flash PAUSED while the resume is in flight
+  overlayKey = null;
+}
+
+function setHelp(open) {
+  if (open === helpOpen) return;
+  helpOpen = open;
+  if (open) releaseKeys(); // never leave a key stuck while the modal is up
+  menuKey = null;
 }
 
 function doAction(name) {
@@ -536,6 +629,115 @@ function mockSnapshot() {
 }
 
 // ---------------------------------------------------------------------------
+// Juice: particle bursts, gate events, motion toggle (M)
+// ---------------------------------------------------------------------------
+// A fixed pool of particle objects; bursts cycle through it so the loop never
+// allocates during play. A particle with life <= 0 is inactive.
+var particles = [];
+for (var pi = 0; pi < PARTICLE_MAX; pi++) {
+  particles.push({ x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, size: 2, color: "#fff" });
+}
+var particleHead = 0;
+
+function clearParticles() {
+  for (var i = 0; i < PARTICLE_MAX; i++) particles[i].life = 0;
+}
+
+function spawnBurst(x, y, op) {
+  if (!motion) return;
+  var color = op === "mul" ? "#7dffb0" : "#ffcf6b";
+  for (var i = 0; i < 12; i++) {
+    var p = particles[particleHead];
+    particleHead = (particleHead + 1) % PARTICLE_MAX;
+    var a = Math.random() * TAU;
+    var sp = 40 + Math.random() * 110;
+    p.x = x + (Math.random() * 2 - 1) * 8;
+    p.y = y + (Math.random() * 2 - 1) * 8;
+    p.vx = Math.cos(a) * sp;
+    p.vy = Math.sin(a) * sp - 30;
+    p.max = 0.28 + Math.random() * 0.24;
+    p.life = p.max;
+    p.size = 2 + Math.random() * 2.5;
+    p.color = color;
+  }
+}
+
+function updateParticles(dt) {
+  for (var i = 0; i < PARTICLE_MAX; i++) {
+    var p = particles[i];
+    if (p.life <= 0) continue;
+    p.life -= dt;
+    if (p.life <= 0) continue;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += PARTICLE_GRAVITY * dt;
+    p.vx *= 0.98;
+  }
+}
+
+function drawParticles() {
+  for (var i = 0; i < PARTICLE_MAX; i++) {
+    var p = particles[i];
+    if (p.life <= 0) continue;
+    ctx.globalAlpha = Math.min(1, p.life / p.max);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// The client never sees a gate "fired" message, so count how many agents sit
+// inside each gate box. When that count rises, agents entered (and therefore
+// multiplied) there: burst at that gate. A per-gate cooldown keeps it cheap.
+var gateTick = -1;
+var gateLevel = -1;
+var gateInit = false;
+var gateNear = [];
+var gateLastBurst = [];
+
+function countInGate(g, blue) {
+  var n = 0;
+  for (var j = 0; j < blue.length; j += 3) {
+    var x = blue[j];
+    var y = blue[j + 1];
+    if (x >= g.x - 8 && x <= g.x + g.w + 8 && y >= g.y - 8 && y <= g.y + g.h + 8) n += 1;
+  }
+  return n;
+}
+
+function trackGates(s, now) {
+  var gates = s.gates;
+  if (!gates || !gates.length) {
+    gateInit = false;
+    return;
+  }
+  if (s.hud && s.hud.level !== gateLevel) {
+    gateLevel = s.hud.level;
+    gateInit = false;
+  }
+  if (s.tick === gateTick && gateInit) return;
+  gateTick = s.tick;
+  var blue = s.blue || [];
+  var i;
+  if (!gateInit || gateNear.length !== gates.length) {
+    gateNear = new Array(gates.length);
+    for (i = 0; i < gates.length; i++) gateNear[i] = countInGate(gates[i], blue);
+    gateInit = true;
+    return;
+  }
+  var active = motion && started && !helpOpen && s.status === "playing";
+  for (i = 0; i < gates.length; i++) {
+    var near = countInGate(gates[i], blue);
+    var inc = near - (gateNear[i] || 0);
+    gateNear[i] = near;
+    if (inc >= GATE_NEAR_MIN && active && now - (gateLastBurst[i] || -1e9) >= GATE_BURST_COOLDOWN) {
+      gateLastBurst[i] = now;
+      spawnBurst(gates[i].x + gates[i].w / 2, gates[i].y + gates[i].h / 2, gates[i].op);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
 function drawField() {
@@ -588,16 +790,21 @@ function drawFortress(s, now) {
   ctx.fillText("PRODUCTION", fieldW / 2, top + 28);
   var b = s.bases;
   drawHpBar(x + 16, top + 52, w - 32, 16, b.enemy_hp, b.enemy_hp_max, "#ff5a5f");
-  if (now < enemyFlashUntil) {
+  if (motion && now < enemyFlashUntil) {
     var a = 0.15 + 0.5 * ((enemyFlashUntil - now) / FLASH_MS);
     ctx.fillStyle = "rgba(255,255,255," + a.toFixed(3) + ")";
     ctx.fillRect(x, top, w, h);
   }
 }
 
-function drawBase(s) {
+function drawBase(s, now) {
   ctx.fillStyle = "#12233d";
   ctx.fillRect(0, PLAYER_BASE_Y, fieldW, fieldH - PLAYER_BASE_Y);
+  if (motion && now < playerFlashUntil) {
+    var fa = 0.5 * ((playerFlashUntil - now) / PLAYER_FLASH_MS);
+    ctx.fillStyle = "rgba(255,70,70," + fa.toFixed(3) + ")";
+    ctx.fillRect(0, PLAYER_BASE_Y, fieldW, fieldH - PLAYER_BASE_Y);
+  }
   ctx.strokeStyle = "#4a90d9";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -731,8 +938,8 @@ function drawLauncher(s) {
 }
 
 function drawDamageGlow(now) {
-  if (now >= playerFlashUntil) return;
-  var a = 0.5 * ((playerFlashUntil - now) / SHAKE_MS);
+  if (!motion || now >= playerFlashUntil) return;
+  var a = 0.5 * ((playerFlashUntil - now) / PLAYER_FLASH_MS);
   ctx.strokeStyle = "rgba(255,60,60," + a.toFixed(3) + ")";
   ctx.lineWidth = 16;
   ctx.strokeRect(8, 8, fieldW - 16, fieldH - 16);
@@ -775,7 +982,7 @@ function render(now) {
   var s = latest || DEFAULT_STATE;
   var dx = 0;
   var dy = 0;
-  if (now < playerFlashUntil) {
+  if (motion && now < playerFlashUntil) {
     var t = (playerFlashUntil - now) / SHAKE_MS;
     dx = (Math.random() * 2 - 1) * 5 * t;
     dy = (Math.random() * 2 - 1) * 3 * t;
@@ -784,11 +991,12 @@ function render(now) {
   ctx.translate(dx, dy);
   drawField();
   drawFortress(s, now);
-  drawBase(s);
+  drawBase(s, now);
   drawGates(s);
   drawUnits(s.blue, "#4a90ff");
   drawBugs(s.red);
   drawLauncher(s);
+  if (motion) drawParticles();
   ctx.restore();
   drawDamageGlow(now);
   drawHud(s);
@@ -864,6 +1072,10 @@ function updateOverlay() {
       key = latest.status;
     }
   }
+  // A resume we just sent still shows as paused in the next snapshot or two;
+  // hide that so starting the game never flashes the PAUSED screen.
+  if (latest && latest.status === "playing") resumePending = false;
+  else if (resumePending && key === "paused") key = "playing";
   if (key === overlayKey) return;
   overlayKey = key;
 
@@ -903,6 +1115,60 @@ function updateOverlay() {
 }
 
 // ---------------------------------------------------------------------------
+// Title screen and help overlay
+// ---------------------------------------------------------------------------
+var menuKey = null;
+
+function keysHtml() {
+  return (
+    '<div class="keys">' +
+    "<div><kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd> move</div>" +
+    "<div><kbd>Space</kbd> fire</div>" +
+    "<div><kbd>P</kbd> pause · <kbd>R</kbd> restart</div>" +
+    "<div><kbd>M</kbd> motion toggle · <kbd>H</kbd>/<kbd>?</kbd> help</div>" +
+    "</div>"
+  );
+}
+
+function titleHtml() {
+  return (
+    '<div class="menu-title">SWARM CONTROL</div>' +
+    '<div class="menu-pitch">Push the bugs back and multiply through the gates.</div>' +
+    keysHtml() +
+    '<div class="menu-hint">Press Space to start</div>'
+  );
+}
+
+function helpHtml() {
+  return (
+    '<div class="menu-title help">HOW TO PLAY</div>' +
+    '<div class="menu-pitch">Push back the bugs, multiply through gates, win 3 levels.</div>' +
+    keysHtml() +
+    '<div class="keys">' +
+    "<div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> buy upgrades · <kbd>N</kbd> next · <kbd>R</kbd> restart</div>" +
+    "</div>" +
+    '<div class="menu-hint">H / ? / Esc to close</div>'
+  );
+}
+
+function updateMenu() {
+  if (!menu) return;
+  var key = helpOpen ? "help" : !started ? "title" : "none";
+  if (key === menuKey) return;
+  menuKey = key;
+  // The title/help menu sits on top of #overlay; hide the overlay's own text
+  // (e.g. the PAUSED message) so it cannot ghost through the menu. updateOverlay
+  // keeps managing #overlay as usual, it is just not visible while covered.
+  if (overlay) overlay.style.visibility = key === "none" ? "" : "hidden";
+  if (key === "none") {
+    menu.classList.remove("show");
+    return;
+  }
+  menu.innerHTML = key === "title" ? titleHtml() : helpHtml();
+  menu.classList.add("show");
+}
+
+// ---------------------------------------------------------------------------
 // Main loop
 // ---------------------------------------------------------------------------
 var lastFrame = 0;
@@ -915,7 +1181,7 @@ function frame(now) {
   lastFrame = now;
 
   try {
-    if (mockMode) {
+    if (mockMode && started && !helpOpen) {
       mockStep(dt);
       if (now - lastEmit >= 1000 / SEND_HZ) {
         latest = mockSnapshot();
@@ -923,12 +1189,15 @@ function frame(now) {
         lastEmit = now;
       }
     }
-    if (haveState && latest) {
+    if (haveState && latest && started) {
       trackLevel(latest);
       trackDamage(latest, now);
+      trackGates(latest, now);
     }
+    if (motion) updateParticles(dt);
     render(now);
     updateOverlay();
+    updateMenu();
   } catch (err) {
     // A malformed state must never stop the animation loop.
     overlayKey = null;
