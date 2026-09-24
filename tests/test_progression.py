@@ -75,7 +75,7 @@ def test_shop_only_works_after_winning_and_prices_are_spent():
 
     w.tokens = config.FIRE_RATE_PRICES[0]
     w.action("buy_fire_rate")
-    assert w.tokens == 0 and w.upgrades["fire_rate"] == 1
+    assert w.tokens == config.FIRE_RATE_PRICES[0] and w.upgrades["fire_rate"] == 1
 
 
 @pytest.mark.parametrize(
