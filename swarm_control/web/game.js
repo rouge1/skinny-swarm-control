@@ -23,6 +23,10 @@ var BLUE_CAPACITY = 4000;
 var RED_CAPACITY = 4000;
 var SEND_HZ = 30;
 
+var FLASH_MS = 120; // fortress bright flash after it takes damage
+var SHAKE_MS = 150; // field shake after the player's base takes damage
+var MOCK_WIN_SECONDS = 20; // mock mode declares a win after this long
+
 // ---------------------------------------------------------------------------
 // DOM and canvas
 // ---------------------------------------------------------------------------
@@ -86,6 +90,34 @@ var DEFAULT_STATE = {
   bases: { enemy_hp: 100, enemy_hp_max: 100, player_hp: 100, player_hp_max: 100 },
   hud: { blue_count: 0, red_count: 0, level: 1, tokens: 0 },
 };
+
+// Damage feedback timers, and the HP/token baselines used for flashing and the
+// win screen ("tokens now" minus "tokens at the start of the level").
+var prevEnemyHp = null;
+var prevPlayerHp = null;
+var enemyFlashUntil = 0;
+var playerFlashUntil = 0;
+var prevTick = -1;
+var prevLevel = -1;
+var levelStartTokens = 0;
+
+function trackDamage(s, now) {
+  var b = s.bases;
+  if (!b) return;
+  if (prevEnemyHp !== null && b.enemy_hp < prevEnemyHp) enemyFlashUntil = now + FLASH_MS;
+  if (prevPlayerHp !== null && b.player_hp < prevPlayerHp) playerFlashUntil = now + SHAKE_MS;
+  prevEnemyHp = b.enemy_hp;
+  prevPlayerHp = b.player_hp;
+}
+
+function trackLevel(s) {
+  if (!s.hud) return;
+  if (s.tick === 0 || s.hud.level !== prevLevel || (prevTick >= 0 && s.tick < prevTick)) {
+    levelStartTokens = s.hud.tokens;
+  }
+  prevLevel = s.hud.level;
+  prevTick = s.tick;
+}
 
 // ---------------------------------------------------------------------------
 // WebSocket connection with reconnect backoff
@@ -225,16 +257,22 @@ function doAction(name) {
 // ---------------------------------------------------------------------------
 // Mock simulation (?mock=1): a small local world so the client runs standalone
 // ---------------------------------------------------------------------------
-var MOCK_GATES = [
-  { x: 110, y: 400, w: 150, h: 42, op: "mul", value: 2, label: "x2" },
-  { x: 300, y: 620, w: 150, h: 42, op: "add", value: 5, label: "+5" },
-];
+function makeMockGates() {
+  return [
+    { x: 55, y: 340, w: 180, h: 46, op: "mul", value: 2, label: "x2 fork", vx: 70 },
+    { x: 305, y: 600, w: 180, h: 46, op: "add", value: 5, label: "+5 subagents", vx: -55 },
+  ];
+}
+
 var sim = {
   tick: 0,
+  time: 0,
   status: "playing",
   launcherX: FIELD_W / 2,
   blue: [],
+  bluePassed: [],
   red: [],
+  gates: makeMockGates(),
   enemyHp: 100,
   playerHp: 100,
   fireTimer: 0,
@@ -245,10 +283,13 @@ var sim = {
 
 function resetMock() {
   sim.tick = 0;
+  sim.time = 0;
   sim.status = "playing";
   sim.launcherX = fieldW / 2;
   sim.blue = [];
+  sim.bluePassed = [];
   sim.red = [];
+  sim.gates = makeMockGates();
   sim.enemyHp = 100;
   sim.playerHp = 100;
   sim.fireTimer = 0;
@@ -262,6 +303,7 @@ function resetMock() {
 function mockStep(dt) {
   if (sim.status !== "playing") return;
   sim.tick += 1;
+  sim.time += dt;
 
   if (keys.left && !keys.right) sim.launcherX -= LAUNCHER_SPEED * dt;
   else if (keys.right && !keys.left) sim.launcherX += LAUNCHER_SPEED * dt;
@@ -273,24 +315,69 @@ function mockStep(dt) {
   sim.fireTimer -= dt;
   if (keys.fire && sim.fireTimer <= 0 && sim.blue.length < BLUE_CAPACITY * 3) {
     sim.blue.push(sim.launcherX, LAUNCHER_Y - 20, 0);
+    sim.bluePassed.push(0);
     sim.fireTimer = FIRE_INTERVAL;
   }
 
+  // Moving gates bounce off the field walls (same rule as sim/gates.py).
+  for (var gi = 0; gi < sim.gates.length; gi++) {
+    var g = sim.gates[gi];
+    var vx = g.vx || 0;
+    if (!vx) continue;
+    g.x += vx * dt;
+    if (g.x < 0) {
+      g.x = -g.x;
+      g.vx = -vx;
+    } else if (g.x + g.w > fieldW) {
+      g.x = 2 * (fieldW - g.w) - g.x;
+      g.vx = -vx;
+    }
+  }
+
+  // Agents fly up; crossing a gate once duplicates them per its op/value.
   var nb = [];
+  var np = [];
   for (var i = 0; i < sim.blue.length; i += 3) {
-    var by = sim.blue[i + 1] - AGENT_SPEED * dt;
-    if (by > FORTRESS_Y) nb.push(sim.blue[i], by, sim.blue[i + 2]);
-    else {
-      sim.enemyHp = Math.max(0, sim.enemyHp - 0.4);
+    var ax = sim.blue[i];
+    var ay = sim.blue[i + 1] - AGENT_SPEED * dt;
+    var kind = sim.blue[i + 2];
+    var mask = sim.bluePassed[i / 3];
+    if (ay <= FORTRESS_Y) {
+      sim.enemyHp = Math.max(0, sim.enemyHp - 0.6);
       sim.tokens += 1;
+      continue;
+    }
+    for (var k = 0; k < sim.gates.length; k++) {
+      var gate = sim.gates[k];
+      var bit = 1 << k;
+      if (
+        (mask & bit) === 0 &&
+        ax >= gate.x &&
+        ax <= gate.x + gate.w &&
+        ay >= gate.y &&
+        ay <= gate.y + gate.h
+      ) {
+        mask |= bit;
+        var copies = gate.op === "mul" ? gate.value - 1 : gate.value;
+        for (var c = 0; c < copies && nb.length < BLUE_CAPACITY * 3; c++) {
+          nb.push(ax + (Math.random() * 2 - 1) * 12, ay + (Math.random() * 2 - 1) * 6, kind);
+          np.push(mask);
+        }
+      }
+    }
+    if (nb.length < BLUE_CAPACITY * 3) {
+      nb.push(ax, ay, kind);
+      np.push(mask);
     }
   }
   sim.blue = nb;
+  sim.bluePassed = np;
 
+  // Bugs walk down; reaching the player base costs HP.
   sim.bugTimer -= dt;
   if (sim.bugTimer <= 0 && sim.red.length < RED_CAPACITY * 3) {
     sim.red.push(40 + Math.random() * (fieldW - 80), FORTRESS_Y, 0);
-    sim.bugTimer = 0.6 + Math.random() * 1.2;
+    sim.bugTimer = 0.9 + Math.random() * 1.1;
   }
 
   var nr = [];
@@ -301,7 +388,7 @@ function mockStep(dt) {
   }
   sim.red = nr;
 
-  if (sim.enemyHp <= 0) sim.status = "won";
+  if (sim.time >= MOCK_WIN_SECONDS || sim.enemyHp <= 0) sim.status = "won";
   else if (sim.playerHp <= 0) sim.status = "lost";
 }
 
@@ -320,7 +407,7 @@ function mockSnapshot() {
     launcher: { x: sim.launcherX, y: LAUNCHER_Y },
     blue: roundUnits(sim.blue),
     red: roundUnits(sim.red),
-    gates: MOCK_GATES,
+    gates: sim.gates,
     bases: {
       enemy_hp: sim.enemyHp,
       enemy_hp_max: 100,
@@ -341,20 +428,22 @@ function mockSnapshot() {
 // ---------------------------------------------------------------------------
 function drawField() {
   ctx.fillStyle = "#0b1020";
-  ctx.fillRect(0, 0, fieldW, fieldH);
+  // Slightly oversized so a shake never reveals the page behind the field.
+  ctx.fillRect(-12, -12, fieldW + 24, fieldH + 24);
   ctx.strokeStyle = "rgba(255,255,255,0.05)";
   ctx.lineWidth = 1;
   ctx.beginPath();
   var lanes = 9;
   for (var i = 1; i < lanes; i++) {
     var x = (fieldW * i) / lanes;
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, fieldH);
+    ctx.moveTo(x, -12);
+    ctx.lineTo(x, fieldH + 12);
   }
   ctx.stroke();
 }
 
-function drawHpBar(x, y, w, h, ratio, color) {
+function drawHpBar(x, y, w, h, cur, max, color) {
+  var ratio = max > 0 ? cur / max : 0;
   var r = Math.max(0, Math.min(1, ratio || 0));
   ctx.fillStyle = "rgba(0,0,0,0.55)";
   ctx.fillRect(x, y, w, h);
@@ -363,9 +452,14 @@ function drawHpBar(x, y, w, h, ratio, color) {
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  ctx.fillStyle = "#f2f6ff";
+  ctx.font = "bold 10px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(Math.round(cur) + " / " + Math.round(max), x + w / 2, y + h / 2 + 0.5);
 }
 
-function drawFortress(s) {
+function drawFortress(s, now) {
   var w = fieldW - 60;
   var h = 88;
   var x = 30;
@@ -379,9 +473,14 @@ function drawFortress(s) {
   ctx.font = "bold 22px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("PRODUCTION", fieldW / 2, top + 30);
+  ctx.fillText("PRODUCTION", fieldW / 2, top + 28);
   var b = s.bases;
-  drawHpBar(x + 16, top + 56, w - 32, 12, b.enemy_hp / b.enemy_hp_max, "#ff5a5f");
+  drawHpBar(x + 16, top + 52, w - 32, 16, b.enemy_hp, b.enemy_hp_max, "#ff5a5f");
+  if (now < enemyFlashUntil) {
+    var a = 0.15 + 0.5 * ((enemyFlashUntil - now) / FLASH_MS);
+    ctx.fillStyle = "rgba(255,255,255," + a.toFixed(3) + ")";
+    ctx.fillRect(x, top, w, h);
+  }
 }
 
 function drawBase(s) {
@@ -394,28 +493,65 @@ function drawBase(s) {
   ctx.lineTo(fieldW, PLAYER_BASE_Y);
   ctx.stroke();
   var b = s.bases;
-  drawHpBar(90, PLAYER_BASE_Y + 4, fieldW - 180, 11, b.player_hp / b.player_hp_max, "#4a90d9");
+  drawHpBar(90, PLAYER_BASE_Y + 4, fieldW - 180, 14, b.player_hp, b.player_hp_max, "#4a90d9");
+}
+
+function roundRectPath(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// Shrink the font until the label fits inside maxW (gates can be narrow).
+// The fitted size is cached by label + width so measureText runs only on change.
+var gateFontCache = {};
+
+function fitFont(text, maxW, basePx) {
+  var key = text + "|" + maxW;
+  var size = gateFontCache[key];
+  if (size === undefined) {
+    size = basePx;
+    var fitted = false;
+    while (size >= 8) {
+      ctx.font = "bold " + size + "px system-ui, sans-serif";
+      if (ctx.measureText(text).width <= maxW) {
+        fitted = true;
+        break;
+      }
+      size -= 1;
+    }
+    if (!fitted) size = 8;
+    gateFontCache[key] = size;
+  }
+  ctx.font = "bold " + size + "px system-ui, sans-serif";
 }
 
 function drawGates(s) {
-  if (!s.gates.length) return;
-  ctx.font = "bold 20px system-ui, sans-serif";
+  if (!s.gates || !s.gates.length) return;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.lineWidth = 2;
   for (var i = 0; i < s.gates.length; i++) {
     var g = s.gates[i];
     var mul = g.op === "mul";
-    ctx.fillStyle = mul ? "rgba(90,200,120,0.18)" : "rgba(240,180,70,0.18)";
-    ctx.fillRect(g.x, g.y, g.w, g.h);
+    roundRectPath(g.x, g.y, g.w, g.h, 10);
+    ctx.fillStyle = mul ? "rgba(90,200,120,0.20)" : "rgba(240,180,70,0.20)";
+    ctx.fill();
     ctx.strokeStyle = mul ? "#5ac878" : "#f0b446";
-    ctx.strokeRect(g.x + 1, g.y + 1, g.w - 2, g.h - 2);
-    ctx.fillStyle = "#eaf2ff";
-    ctx.fillText(g.label, g.x + g.w / 2, g.y + g.h / 2);
+    ctx.stroke();
+    var label = g.label == null ? "" : String(g.label);
+    fitFont(label, g.w - 16, 22);
+    ctx.fillStyle = mul ? "#d8ffe4" : "#fff0cf";
+    ctx.fillText(label, g.x + g.w / 2, g.y + g.h / 2 + 0.5);
   }
 }
 
-// Draw every unit of one colour in a single path: no per-unit fill or objects.
+// Draw every blue agent in a single path: no per-unit fill or objects.
 function drawUnits(flat, color) {
   if (!flat.length) return;
   ctx.fillStyle = color;
@@ -427,6 +563,39 @@ function drawUnits(flat, color) {
     ctx.arc(x, y, UNIT_RADIUS, 0, TAU);
   }
   ctx.fill();
+}
+
+// Draw every bug as a beetle in ONE path for the whole red list. Legs are only
+// added below a small count: at full load the extra segments are the main cost,
+// so bodies alone keep the frame budget safe.
+var BUG_LEG_LIMIT = 800;
+
+function drawBugs(flat) {
+  if (!flat.length) return;
+  var r = UNIT_RADIUS;
+  var legs = flat.length / 3 < BUG_LEG_LIMIT;
+  ctx.beginPath();
+  for (var i = 0; i < flat.length; i += 3) {
+    var x = flat[i];
+    var y = flat[i + 1];
+    ctx.moveTo(x + r, y);
+    ctx.arc(x, y, r, 0, TAU);
+    if (legs) {
+      ctx.moveTo(x - r * 0.5, y - r * 0.4);
+      ctx.lineTo(x - r * 1.5, y - r * 1.0);
+      ctx.moveTo(x - r * 0.5, y + r * 0.4);
+      ctx.lineTo(x - r * 1.5, y + r * 1.0);
+      ctx.moveTo(x + r * 0.5, y - r * 0.4);
+      ctx.lineTo(x + r * 1.5, y - r * 1.0);
+      ctx.moveTo(x + r * 0.5, y + r * 0.4);
+      ctx.lineTo(x + r * 1.5, y + r * 1.0);
+    }
+  }
+  ctx.fillStyle = "#ff4d4d";
+  ctx.fill();
+  ctx.strokeStyle = "#ff9a9a";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
 }
 
 function drawLauncher(s) {
@@ -449,6 +618,14 @@ function drawLauncher(s) {
   ctx.stroke();
 }
 
+function drawDamageGlow(now) {
+  if (now >= playerFlashUntil) return;
+  var a = 0.5 * ((playerFlashUntil - now) / SHAKE_MS);
+  ctx.strokeStyle = "rgba(255,60,60," + a.toFixed(3) + ")";
+  ctx.lineWidth = 16;
+  ctx.strokeRect(8, 8, fieldW - 16, fieldH - 16);
+}
+
 function drawHud(s) {
   ctx.fillStyle = "rgba(0,0,0,0.5)";
   ctx.fillRect(0, 0, fieldW, 26);
@@ -466,37 +643,70 @@ function drawHud(s) {
   ctx.fillText("TOKENS " + s.hud.tokens, fieldW - 12, 13);
 }
 
-function render() {
+function render(now) {
   var s = latest || DEFAULT_STATE;
+  var dx = 0;
+  var dy = 0;
+  if (now < playerFlashUntil) {
+    var t = (playerFlashUntil - now) / SHAKE_MS;
+    dx = (Math.random() * 2 - 1) * 5 * t;
+    dy = (Math.random() * 2 - 1) * 3 * t;
+  }
+  ctx.save();
+  ctx.translate(dx, dy);
   drawField();
-  drawFortress(s);
+  drawFortress(s, now);
   drawBase(s);
   drawGates(s);
   drawUnits(s.blue, "#4a90ff");
-  drawUnits(s.red, "#ff4d4d");
+  drawBugs(s.red);
   drawLauncher(s);
+  ctx.restore();
+  drawDamageGlow(now);
   drawHud(s);
 }
 
 // ---------------------------------------------------------------------------
 // Overlay (connecting / paused / won / lost)
 // ---------------------------------------------------------------------------
+var overlayKey = null;
+
 function updateOverlay() {
   if (!overlay) return;
-  if (!haveState) {
+  var key;
+  if (!haveState) key = "connecting";
+  else key = latest ? latest.status : "playing";
+  if (key === overlayKey) return;
+  overlayKey = key;
+
+  overlay.classList.remove("won", "lose");
+  if (key === "connecting") {
     overlay.textContent = "Connecting…";
     overlay.classList.add("show");
-    return;
-  }
-  var st = latest ? latest.status : "playing";
-  if (st === "paused") overlay.textContent = "PAUSED\nPress P to resume";
-  else if (st === "won") overlay.textContent = "YOU WIN\nPress R to restart";
-  else if (st === "lost") overlay.textContent = "GAME OVER\nPress R to restart";
-  else {
+  } else if (key === "paused") {
+    overlay.textContent = "PAUSED\nPress P to resume";
+    overlay.classList.add("show");
+  } else if (key === "won") {
+    var gained = latest ? Math.max(0, latest.hud.tokens - levelStartTokens) : 0;
+    overlay.innerHTML =
+      '<div class="end">' +
+      '<div class="end-title">SHIPPED!</div>' +
+      '<div class="end-line">Production is bug-free</div>' +
+      '<div class="end-tokens">+' + gained + " tokens</div>" +
+      '<div class="end-hint">Press R to play again</div>' +
+      "</div>";
+    overlay.classList.add("show", "won");
+  } else if (key === "lost") {
+    overlay.innerHTML =
+      '<div class="end">' +
+      '<div class="end-title">OUTAGE</div>' +
+      '<div class="end-line">Bugs reached your base</div>' +
+      '<div class="end-hint">Press R to try again</div>' +
+      "</div>";
+    overlay.classList.add("show", "lose");
+  } else {
     overlay.classList.remove("show");
-    return;
   }
-  overlay.classList.add("show");
 }
 
 // ---------------------------------------------------------------------------
@@ -511,17 +721,25 @@ function frame(now) {
   var dt = Math.min((now - lastFrame) / 1000, 0.1);
   lastFrame = now;
 
-  if (mockMode) {
-    mockStep(dt);
-    if (now - lastEmit >= 1000 / SEND_HZ) {
-      latest = mockSnapshot();
-      haveState = true;
-      lastEmit = now;
+  try {
+    if (mockMode) {
+      mockStep(dt);
+      if (now - lastEmit >= 1000 / SEND_HZ) {
+        latest = mockSnapshot();
+        haveState = true;
+        lastEmit = now;
+      }
     }
+    if (haveState && latest) {
+      trackLevel(latest);
+      trackDamage(latest, now);
+    }
+    render(now);
+    updateOverlay();
+  } catch (err) {
+    // A malformed state must never stop the animation loop.
+    overlayKey = null;
   }
-
-  render();
-  updateOverlay();
 }
 
 // ---------------------------------------------------------------------------
