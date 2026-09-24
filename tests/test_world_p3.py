@@ -184,6 +184,15 @@ def test_every_level_is_winnable_by_a_scripted_player():
         assert w.status == "won", f"level {n} ended {w.status} (enemy {w.enemy_hp}, player {w.player_hp})"
 
 
+def test_idle_player_loses_every_level():
+    from swarm_control.sim.waves import LEVELS
+
+    for n in range(1, len(LEVELS) + 1):
+        w = World(seed=1, level=get_level(n))
+        run(w, 180.0)  # never fires
+        assert w.status == "lost", f"level {n}: an idle player should lose (status {w.status})"
+
+
 def test_step_performance_under_load():
     w = new_game()
     rng = np.random.default_rng(0)
