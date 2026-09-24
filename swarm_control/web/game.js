@@ -1156,6 +1156,10 @@ function updateMenu() {
   var key = helpOpen ? "help" : !started ? "title" : "none";
   if (key === menuKey) return;
   menuKey = key;
+  // The title/help menu sits on top of #overlay; hide the overlay's own text
+  // (e.g. the PAUSED message) so it cannot ghost through the menu. updateOverlay
+  // keeps managing #overlay as usual, it is just not visible while covered.
+  if (overlay) overlay.style.visibility = key === "none" ? "" : "hidden";
   if (key === "none") {
     menu.classList.remove("show");
     return;
