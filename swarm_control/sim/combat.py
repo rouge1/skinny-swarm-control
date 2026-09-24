@@ -38,97 +38,127 @@ def collide(blue: UnitPool, red: UnitPool, radius: float = config.UNIT_RADIUS) -
 
     blue_slots = blue.active_indices()
     red_slots = red.active_indices()
-    blue_valid = np.isfinite(blue.x[blue_slots]) & np.isfinite(blue.y[blue_slots])
-    red_valid = np.isfinite(red.x[red_slots]) & np.isfinite(red.y[red_slots])
+    blue_valid = (
+        np.isfinite(blue.x[blue_slots])
+        & np.isfinite(blue.y[blue_slots])
+        & (np.abs(blue.x[blue_slots]) <= 1.0e12)
+        & (np.abs(blue.y[blue_slots]) <= 1.0e12)
+    )
+    red_valid = (
+        np.isfinite(red.x[red_slots])
+        & np.isfinite(red.y[red_slots])
+        & (np.abs(red.x[red_slots]) <= 1.0e12)
+        & (np.abs(red.y[red_slots]) <= 1.0e12)
+    )
     blue_slots = blue_slots[blue_valid]
     red_slots = red_slots[red_valid]
     if blue_slots.size == 0 or red_slots.size == 0:
         return 0
 
-    cell_size = 2.0 * radius
-    with np.errstate(over="ignore", invalid="ignore"):
-        blue_cell_x = np.floor(blue.x[blue_slots] / cell_size)
-        blue_cell_y = np.floor(blue.y[blue_slots] / cell_size)
-        red_cell_x = np.floor(red.x[red_slots] / cell_size)
-        red_cell_y = np.floor(red.y[red_slots] / cell_size)
-
-    # Clipping keeps conversion to int64 defined for unusually large coordinates.
-    int_min = np.iinfo(np.int64).min
+    cell_size = radius
+    blue_x = np.floor(blue.x[blue_slots] / cell_size).astype(np.int64)
+    blue_y = np.floor(blue.y[blue_slots] / cell_size).astype(np.int64)
+    red_x = np.floor(red.x[red_slots] / cell_size).astype(np.int64)
+    red_y = np.floor(red.y[red_slots] / cell_size).astype(np.int64)
+    min_x = min(int(blue_x.min()), int(red_x.min()))
+    max_x = max(int(blue_x.max()), int(red_x.max()))
+    min_y = min(int(blue_y.min()), int(red_y.min()))
+    max_y = max(int(blue_y.max()), int(red_y.max()))
+    rows = max_y - min_y + 1
+    columns = max_x - min_x + 1
     int_max = np.iinfo(np.int64).max
-    blue_cell_x = np.clip(blue_cell_x, int_min, int_max).astype(np.int64)
-    blue_cell_y = np.clip(blue_cell_y, int_min, int_max).astype(np.int64)
-    red_cell_x = np.clip(red_cell_x, int_min, int_max).astype(np.int64)
-    red_cell_y = np.clip(red_cell_y, int_min, int_max).astype(np.int64)
-    min_cell_x = min(int(blue_cell_x.min()), int(red_cell_x.min()))
-    max_cell_x = max(int(blue_cell_x.max()), int(red_cell_x.max()))
-    min_cell_y = min(int(blue_cell_y.min()), int(red_cell_y.min()))
-    max_cell_y = max(int(blue_cell_y.max()), int(red_cell_y.max()))
-    cell_rows = max_cell_y - min_cell_y + 1
-    cell_columns = max_cell_x - min_cell_x + 1
-    if cell_rows > int_max // cell_columns:
-        raise ValueError("active coordinates span too many collision cells")
+    if rows > int_max // columns:
+        return 0
 
-    red_keys = (red_cell_x - min_cell_x) * cell_rows + (red_cell_y - min_cell_y)
+    blue_keys = (blue_x - min_x) * rows + (blue_y - min_y)
+    red_keys = (red_x - min_x) * rows + (red_y - min_y)
+    blue_order = np.argsort(blue_keys, kind="stable")
     red_order = np.argsort(red_keys, kind="stable")
+    sorted_blue_keys = blue_keys[blue_order]
     sorted_red_keys = red_keys[red_order]
-    candidate_blue: list[np.ndarray] = []
-    candidate_red: list[np.ndarray] = []
-    blue_numbers = np.arange(blue_slots.size, dtype=np.int64)
 
-    for dx in (-1, 0, 1):
-        for dy in (-1, 0, 1):
-            query = (blue_cell_x + dx - min_cell_x) * cell_rows + (
-                blue_cell_y + dy - min_cell_y
-            )
-            left = np.searchsorted(sorted_red_keys, query, side="left")
-            right = np.searchsorted(sorted_red_keys, query, side="right")
-            counts = right - left
-            total = int(counts.sum())
-            if total == 0:
-                continue
-            starts = np.repeat(left, counts)
-            offsets = np.arange(total, dtype=np.int64)
-            group_starts = np.repeat(np.cumsum(counts) - counts, counts)
-            candidate_blue.append(np.repeat(blue_numbers, counts))
-            candidate_red.append(red_order[starts + offsets - group_starts])
+    # A radius-sized cell has a diagonal shorter than the contact diameter.
+    red_left = np.searchsorted(sorted_red_keys, sorted_blue_keys, side="left")
+    red_right = np.searchsorted(sorted_red_keys, sorted_blue_keys, side="right")
+    blue_group_start = np.flatnonzero(
+        np.r_[True, sorted_blue_keys[1:] != sorted_blue_keys[:-1]]
+    )
+    blue_group_counts = np.diff(np.r_[blue_group_start, sorted_blue_keys.size])
+    blue_group_starts = np.repeat(blue_group_start, blue_group_counts)
+    blue_rank = np.arange(sorted_blue_keys.size) - blue_group_starts
+    same_cell = blue_rank < (red_right - red_left)
+    matched_blue = [blue_order[same_cell]]
+    matched_red = [red_order[red_left[same_cell] + blue_rank[same_cell]]]
+    blue_available = np.ones(blue_slots.size, dtype=np.bool_)
+    red_available = np.ones(red_slots.size, dtype=np.bool_)
+    blue_available[matched_blue[0]] = False
+    red_available[matched_red[0]] = False
 
-    if not candidate_blue:
-        return 0
-    pair_blue = np.concatenate(candidate_blue)
-    pair_red = np.concatenate(candidate_red)
-    dx = blue.x[blue_slots[pair_blue]] - red.x[red_slots[pair_red]]
-    dy = blue.y[blue_slots[pair_blue]] - red.y[red_slots[pair_red]]
-    in_contact = dx * dx + dy * dy < cell_size * cell_size
-    pair_blue = pair_blue[in_contact]
-    pair_red = pair_red[in_contact]
+    work_blue = np.flatnonzero(blue_available)
+    work_red = np.flatnonzero(red_available)
+    if work_blue.size and work_red.size:
+        candidate_blue: list[np.ndarray] = []
+        candidate_red: list[np.ndarray] = []
+        work_x = blue_x[work_blue]
+        work_y = blue_y[work_blue]
+        work_red_keys = red_keys[work_red]
+        work_red_order = np.argsort(work_red_keys, kind="stable")
+        sorted_work_red_keys = work_red_keys[work_red_order]
+        work_numbers = np.arange(work_blue.size, dtype=np.int64)
+        for offset_x in range(-2, 3):
+            query_x = work_x + offset_x
+            x_in_bounds = (query_x >= min_x) & (query_x <= max_x)
+            for offset_y in range(-2, 3):
+                query_y = work_y + offset_y
+                in_bounds = x_in_bounds & (query_y >= min_y) & (query_y <= max_y)
+                query = (query_x - min_x) * rows + (query_y - min_y)
+                left = np.searchsorted(sorted_work_red_keys, query, side="left")
+                right = np.searchsorted(sorted_work_red_keys, query, side="right")
+                counts = np.where(in_bounds, right - left, 0)
+                total = int(counts.sum())
+                if total == 0:
+                    continue
+                starts = np.repeat(left, counts)
+                offsets = np.arange(total, dtype=np.int64)
+                group_starts = np.repeat(np.cumsum(counts) - counts, counts)
+                candidate_blue.append(np.repeat(work_numbers, counts))
+                candidate_red.append(work_red_order[starts + offsets - group_starts])
 
-    matched_blue: list[np.ndarray] = []
-    matched_red: list[np.ndarray] = []
-    while pair_blue.size:
-        order = np.lexsort((pair_red, pair_blue))
-        ordered_blue = pair_blue[order]
-        first_blue = np.r_[True, ordered_blue[1:] != ordered_blue[:-1]]
-        selected = order[first_blue]
-        selected_red = pair_red[selected]
-        red_order_for_selection = np.argsort(selected_red, kind="stable")
-        first_red = np.r_[
-            True,
-            selected_red[red_order_for_selection][1:]
-            != selected_red[red_order_for_selection][:-1],
-        ]
-        selected = selected[red_order_for_selection[first_red]]
-        if selected.size == 0:
-            break
-        matched_blue.append(pair_blue[selected])
-        matched_red.append(pair_red[selected])
-        remaining = ~np.isin(pair_blue, pair_blue[selected]) & ~np.isin(
-            pair_red, pair_red[selected]
-        )
-        pair_blue = pair_blue[remaining]
-        pair_red = pair_red[remaining]
+        if candidate_blue:
+            pair_blue = np.concatenate(candidate_blue)
+            pair_red = np.concatenate(candidate_red)
+            blue_coords = work_blue[pair_blue]
+            red_coords = work_red[pair_red]
+            distance_x = blue.x[blue_slots[blue_coords]] - red.x[red_slots[red_coords]]
+            distance_y = blue.y[blue_slots[blue_coords]] - red.y[red_slots[red_coords]]
+            in_contact = distance_x * distance_x + distance_y * distance_y < (2 * radius) ** 2
+            pair_blue = blue_coords[in_contact]
+            pair_red = red_coords[in_contact]
+            if pair_blue.size:
+                edge_order = np.lexsort((pair_red, pair_blue))
+                pair_blue = pair_blue[edge_order]
+                pair_red = pair_red[edge_order]
+                round_number = 0
+                while pair_blue.size:
+                    starts = np.flatnonzero(
+                        np.r_[True, pair_blue[1:] != pair_blue[:-1]]
+                    )
+                    counts = np.diff(np.r_[starts, pair_blue.size])
+                    proposed = starts + (pair_blue[starts] + round_number) % counts
+                    proposed_red = pair_red[proposed]
+                    _, first = np.unique(proposed_red, return_index=True)
+                    selected = proposed[first]
+                    selected_blue = pair_blue[selected]
+                    selected_red = pair_red[selected]
+                    matched_blue.append(selected_blue)
+                    matched_red.append(selected_red)
+                    blue_available[selected_blue] = False
+                    red_available[selected_red] = False
+                    remaining = blue_available[pair_blue] & red_available[pair_red]
+                    pair_blue = pair_blue[remaining]
+                    pair_red = pair_red[remaining]
+                    round_number += 1
 
-    if not matched_blue:
-        return 0
     matched_blue_array = np.concatenate(matched_blue)
     matched_red_array = np.concatenate(matched_red)
     blue.despawn(blue_slots[matched_blue_array])
