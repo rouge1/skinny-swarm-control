@@ -13,6 +13,7 @@ addopts = "-q"
 [tool.ruff]
 line-length = 110
 target-version = "py312"
+extend-exclude = ["tools"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]

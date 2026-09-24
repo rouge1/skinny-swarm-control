@@ -123,3 +123,35 @@ def test_hit_bases_custom_lines():
     red.spawn(0, 50)
     assert hit_bases(blue, red, enemy_y=40, player_y=60) == (0, 0)
     assert hit_bases(blue, red, enemy_y=50, player_y=50) == (1, 1)
+
+
+def test_dense_stack_on_one_point_is_fast():
+    # gate bursts pile hundreds of units onto nearly the same spot
+    for n, limit in ((1000, 0.04), (4000, 0.08)):
+        blue, red = pools()
+        blue.spawn_many(np.full(n, 200.0), np.full(n, 300.0))
+        red.spawn_many(np.full(n, 202.0), np.full(n, 300.0))
+        t = time.perf_counter()
+        assert collide(blue, red) == n
+        assert time.perf_counter() - t < limit, f"{n}v{n} stacked"
+
+
+def test_gate_burst_clump_fits_a_frame():
+    rng = np.random.default_rng(0)
+    blue, red = pools()
+    blue.spawn_many(rng.normal(270, 6, 400), rng.normal(500, 6, 400))
+    red.spawn_many(rng.normal(270, 6, 400), rng.normal(500, 6, 400))
+    t = time.perf_counter()
+    collide(blue, red)
+    assert time.perf_counter() - t < 0.01
+    assert no_contacts_left(blue, red)
+
+
+def test_dense_box_fits_a_frame():
+    rng = np.random.default_rng(4)
+    blue, red = pools()
+    blue.spawn_many(rng.uniform(200, 340, 1500), rng.uniform(400, 480, 1500))
+    red.spawn_many(rng.uniform(200, 340, 1500), rng.uniform(470, 550, 1500))
+    t = time.perf_counter()
+    collide(blue, red)
+    assert time.perf_counter() - t < 0.016
