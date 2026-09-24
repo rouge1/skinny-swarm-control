@@ -115,6 +115,7 @@ var mockMode = new URLSearchParams(window.location.search).get("mock") === "1";
 var started = false;
 var helpOpen = false;
 var motion = true;
+var resumePending = false; // hiding PAUSED while the start-of-game resume is in flight
 
 var DEFAULT_STATE = {
   type: "state",
@@ -167,6 +168,29 @@ function trackLevel(s) {
   prevTick = s.tick;
 }
 
+// Re-seed every feedback baseline from the newest snapshot. Called when the
+// title is dismissed so the first live frame cannot flash damage or burst at a
+// gate that was crossed before play began.
+function resetTracking(s) {
+  prevEnemyHp = null;
+  prevPlayerHp = null;
+  enemyFlashUntil = 0;
+  playerFlashUntil = 0;
+  prevTick = -1;
+  prevLevel = -1;
+  gateInit = false;
+  if (!s) return;
+  if (s.bases) {
+    prevEnemyHp = s.bases.enemy_hp;
+    prevPlayerHp = s.bases.player_hp;
+  }
+  if (s.hud) {
+    prevLevel = s.hud.level;
+    prevTick = s.tick;
+    levelStartTokens = s.hud.tokens;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // WebSocket connection with reconnect backoff
 // ---------------------------------------------------------------------------
@@ -186,6 +210,11 @@ function connect() {
   socket.onopen = function () {
     sentInput = { left: false, right: false, fire: false };
     sendInput(true);
+    // The world starts stepping the moment the socket opens. Keep it paused
+    // behind the title so play begins on frame one instead of mid-level.
+    if (!started && socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "action", action: "pause" }));
+    }
   };
   socket.onmessage = function (ev) {
     var msg;
@@ -332,6 +361,13 @@ function onKeyUp(e) {
 function startGame() {
   started = true;
   menuKey = null; // hide the title
+  resetTracking(latest); // fresh baselines for the first live frame
+  if (mockMode) return; // the local sim unfreezes on its own
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ type: "action", action: "resume" }));
+  }
+  resumePending = true; // do not flash PAUSED while the resume is in flight
+  overlayKey = null;
 }
 
 function setHelp(open) {
@@ -1036,6 +1072,10 @@ function updateOverlay() {
       key = latest.status;
     }
   }
+  // A resume we just sent still shows as paused in the next snapshot or two;
+  // hide that so starting the game never flashes the PAUSED screen.
+  if (latest && latest.status === "playing") resumePending = false;
+  else if (resumePending && key === "paused") key = "playing";
   if (key === overlayKey) return;
   overlayKey = key;
 
@@ -1145,7 +1185,7 @@ function frame(now) {
         lastEmit = now;
       }
     }
-    if (haveState && latest) {
+    if (haveState && latest && started) {
       trackLevel(latest);
       trackDamage(latest, now);
       trackGates(latest, now);
