@@ -201,3 +201,15 @@ def test_step_performance_under_load():
     t = time.perf_counter()
     run(w, 2.0, fire=True)
     assert (time.perf_counter() - t) / 120 < 0.004
+
+
+def test_standing_still_is_not_a_quick_win():
+    """Holding fire without moving must not beat any level in under 20 s, wherever the launcher stands."""
+    from swarm_control.sim.waves import LEVELS
+
+    for n in range(1, len(LEVELS) + 1):
+        for x in (90, 180, 270, 360, 450):
+            w = World(seed=1, level=get_level(n))
+            w.launcher_x = float(x)
+            run(w, 20.0, fire=True)
+            assert w.status != "won", f"level {n}: standing at x={x} wins in {w.elapsed:.1f} s"

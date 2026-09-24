@@ -28,7 +28,7 @@ from fastapi.staticfiles import StaticFiles
 
 from swarm_control import config
 from swarm_control.protocol import ACTIONS
-from swarm_control.sim.world import World
+from swarm_control.sim.world import World, new_game
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
@@ -52,7 +52,7 @@ def _handle_message(world: World, msg: object) -> None:
             world.action(name)
 
 
-def create_app(world_factory: Callable[[], World] = World) -> FastAPI:
+def create_app(world_factory: Callable[[], World] = new_game) -> FastAPI:
     """Create the FastAPI app; each /ws connection gets `world_factory()`."""
     app = FastAPI()
 

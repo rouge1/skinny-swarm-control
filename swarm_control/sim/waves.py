@@ -47,7 +47,7 @@ LEVELS: list[dict] = [
     {
         "id": 1,
         "name": "First Contact",
-        "enemy_hp": 80.0,
+        "enemy_hp": 1000.0,
         "player_hp": 20.0,
         "reward": 10,
         "gates": [
@@ -72,7 +72,7 @@ LEVELS: list[dict] = [
     {
         "id": 2,
         "name": "Parallel Front",
-        "enemy_hp": 200.0,
+        "enemy_hp": 2000.0,
         "player_hp": 25.0,
         "reward": 25,
         "gates": [
@@ -108,7 +108,7 @@ LEVELS: list[dict] = [
     {
         "id": 3,
         "name": "Swarm Cascade",
-        "enemy_hp": 450.0,
+        "enemy_hp": 3000.0,
         "player_hp": 30.0,
         "reward": 50,
         "gates": [
